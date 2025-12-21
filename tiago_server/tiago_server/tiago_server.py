@@ -11,20 +11,6 @@ from absl import app, flags
 from datetime import datetime
 from collections import OrderedDict
 from flask import Flask, request, jsonify
-import os
-import cv2
-import gym
-import json
-import zlib
-import time
-import rospy
-import pickle
-import base64
-import numpy as np
-from absl import app, flags
-from datetime import datetime
-from collections import OrderedDict
-from flask import Flask, request, jsonify
 from tiago_server.tiago_sys.tiago_ctrl.tiago_core import Tiago
 from tiago_server.tiago_sys.tiago_ctrl.tiago_head import LookAtFixedPoint
 from tiago_server.tiago_sys.utils.general_utils import AttrDict
@@ -82,34 +68,36 @@ class TiagoEnv:
     @property
     def state_space(self):
         st_space = OrderedDict()
-        st_space['left'] = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(3+4+1,), dtype=np.float32)
-        st_space['right'] = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(3+4+1,), dtype=np.float32)
-        st_space['left_joints'] = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(7,), dtype=np.float32)
-        st_space['right_joints'] = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(7,), dtype=np.float32)
-        st_space['base_pose'] = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(3,), dtype=np.float32)
-        st_space['base_velocity'] = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(3,), dtype=np.float32)
-        st_space['torso'] = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(1,), dtype=np.float32)
+        st_space['left'] = {'type': 'Box', 'low': [-1e10]*8, 'high': [1e10]*8, 'shape': [8], 'dtype': 'float32'}
+        st_space['right'] = {'type': 'Box', 'low': [-1e10]*8, 'high': [1e10]*8, 'shape': [8], 'dtype': 'float32'}
+        st_space['left_joints'] = {'type': 'Box', 'low': [-1e10]*7, 'high': [1e10]*7, 'shape': [7], 'dtype': 'float32'}
+        st_space['right_joints'] = {'type': 'Box', 'low': [-1e10]*7, 'high': [1e10]*7, 'shape': [7], 'dtype': 'float32'}
+        st_space['base_pose'] = {'type': 'Box', 'low': [-1e10]*3, 'high': [1e10]*3, 'shape': [3], 'dtype': 'float32'}
+        st_space['base_velocity'] = {'type': 'Box', 'low': [-1e10]*3, 'high': [1e10]*3, 'shape': [3], 'dtype': 'float32'}
+        st_space['torso'] = {'type': 'Box', 'low': [-1e10]*1, 'high': [1e10]*1, 'shape': [1], 'dtype': 'float32'}
         for cam in self.cameras.keys():
-            st_space[f'{cam}_image'] = gym.spaces.Box(low=0, high=255, shape=self.cameras[cam].img_shape, dtype=np.uint8)
-            st_space[f'{cam}_depth'] = gym.spaces.Box(low=0, high=65535, shape=self.cameras[cam].depth_shape, dtype=np.uint16)
-        return gym.spaces.Dict(st_space)
+            img_shape = self.cameras[cam].img_shape
+            depth_shape = self.cameras[cam].depth_shape
+            st_space[f'{cam}_image'] = {'type': 'Box', 'low': 0, 'high': 255, 'shape': list(img_shape), 'dtype': 'uint8'}
+            st_space[f'{cam}_depth'] = {'type': 'Box', 'low': 0, 'high': 65535, 'shape': list(depth_shape), 'dtype': 'uint16'}
+        return st_space
     
     @property
     def observation_space(self):
         st_space = self.state_space
         ob_space = OrderedDict()
         for key in self.all_obs_keys:
-            ob_space[key] = st_space.spaces[key]
-        return gym.spaces.Dict(ob_space)
+            ob_space[key] = st_space[key]
+        return ob_space
     
     @property
     def action_space(self):
         act_space = OrderedDict()
-        act_space['left'] = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(8,), dtype=np.float32)
-        act_space['right'] = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(8,), dtype=np.float32)
-        act_space['base'] = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(3,), dtype=np.float32)
-        act_space['torso'] = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(1,), dtype=np.float32)
-        return gym.spaces.Dict(act_space)
+        act_space['left'] = {'type': 'Box', 'low': [-1e10]*8, 'high': [1e10]*8, 'shape': [8], 'dtype': 'float32'}
+        act_space['right'] = {'type': 'Box', 'low': [-1e10]*8, 'high': [1e10]*8, 'shape': [8], 'dtype': 'float32'}
+        act_space['base'] = {'type': 'Box', 'low': [-1e10]*3, 'high': [1e10]*3, 'shape': [3], 'dtype': 'float32'}
+        act_space['torso'] = {'type': 'Box', 'low': [-1e10]*1, 'high': [1e10]*1, 'shape': [1], 'dtype': 'float32'}
+        return act_space
 
     def _state(self):
         states = AttrDict({

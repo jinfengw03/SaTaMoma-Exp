@@ -1,5 +1,8 @@
 import cv2
-import gym
+try:
+    import gym
+except ImportError:
+    gym = None
 import base64
 import numpy as np
 from typing import Any
@@ -104,16 +107,18 @@ def serialize_space_dict(space_dict):
     @func: serialize a gym.spaces.Dict composed of Box spaces into a JSON-serializable dictionary.t
         this function handles inf, -inf, and NaN by replacing them with large/safe values.
     """
-    serialized = OrderedDict()
-    for key, box in space_dict.spaces.items():
-        serialized[key] = {
-            'type': 'Box',
-            'low': sanitize_array(box.low, box.dtype),
-            'high': sanitize_array(box.high, box.dtype),
-            'shape': box.shape,
-            'dtype': str(box.dtype)
-        }
-    return serialized
+    if not isinstance(space_dict, dict) and gym is not None and isinstance(space_dict, gym.spaces.Dict):
+        serialized = OrderedDict()
+        for key, box in space_dict.spaces.items():
+            serialized[key] = {
+                'type': 'Box',
+                'low': sanitize_array(box.low, box.dtype),
+                'high': sanitize_array(box.high, box.dtype),
+                'shape': box.shape,
+                'dtype': str(box.dtype)
+            }
+        return serialized
+    return space_dict
 
 def restore_inf(arr, dtype=np.float32):
     """
@@ -130,6 +135,8 @@ def reconstruct_space_dict(data):
     @func: reconstruct a gym.spaces.Dict from a JSON-deserialized dictionary
         by restoring the original inf values and creating Box spaces.
     """
+    if gym is None:
+        raise ImportError("gym is required for reconstruct_space_dict")
     space_dict = OrderedDict()
     for key, val in data.items():
         if val['type'] == 'Box':
