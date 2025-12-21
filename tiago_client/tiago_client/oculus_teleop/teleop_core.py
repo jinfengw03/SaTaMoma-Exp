@@ -1,6 +1,6 @@
 import numpy as np
 from dataclasses import dataclass, field
-from tiago_onboard.tiago_sys.utils.general_utils import AttrDict
+from tiago_client.utils.general_utils import AttrDict
 
 
 @dataclass

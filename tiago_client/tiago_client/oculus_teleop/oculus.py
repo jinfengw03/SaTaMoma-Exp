@@ -1,8 +1,8 @@
 import time
 import numpy as np
-from tiago_onboard.tiago_sys.utils.general_utils import run_threaded_command
-from tiago_onboard.tiago_sys.utils.transformations import quat_diff, quat_to_euler, rmat_to_quat
-from tiago_onboard.tiago_sys.oculus_teleop.teleop_core import BaseTeleopInterface, TeleopAction, TeleopObservation
+from tiago_client.utils.general_utils import run_threaded_command
+from tiago_client.utils.transformations import quat_diff, quat_to_euler, rmat_to_quat
+from tiago_client.oculus_teleop.teleop_core import BaseTeleopInterface, TeleopAction, TeleopObservation
 
 
 def vec_to_reorder_mat(vec):

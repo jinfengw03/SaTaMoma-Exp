@@ -4,8 +4,8 @@ from pynput import keyboard
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Twist
 from sensor_msgs.msg import LaserScan
-from tiago_onboard.tiago_sys.utils.transformations import quat_diff, quat_to_euler
-from tiago_onboard.tiago_sys.utils.ros_utils import Publisher, Listener, create_twist_command
+from tiago_server.tiago_sys.utils.transformations import quat_diff, quat_to_euler
+from tiago_server.tiago_sys.utils.ros_utils import Publisher, Listener, create_twist_command
 
 
 class TiagoBase:

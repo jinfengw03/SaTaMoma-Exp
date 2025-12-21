@@ -4,8 +4,8 @@ import numpy as np
 from std_msgs.msg import Header
 from control_msgs.msg import JointTrajectoryControllerState
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
-from tiago_onboard.tiago_sys.utils.ros_utils import Publisher, Listener, TFTransformListener
-from tiago_onboard.tiago_sys.utils.transformations import euler_to_quat, quat_to_euler, quat_diff, add_angles, add_quats, quat_to_rmat
+from tiago_server.tiago_sys.utils.ros_utils import Publisher, Listener, TFTransformListener
+from tiago_server.tiago_sys.utils.transformations import euler_to_quat, quat_to_euler, quat_diff, add_angles, add_quats, quat_to_rmat
 from tracikpy import TracIKSolver # repo for Inverse Kinematics computation  
 
 
@@ -95,6 +95,15 @@ class TiagoArms:
             joint_goal, duration_scale = self.find_ik(target_pos, target_quat)
             if joint_goal is not None:
                 self.write(joint_goal, duration_scale) # [absolute control]
+
+    def step_joints(self, joint_goal):
+        if self.arm_enabled:
+            assert len(joint_goal) == 7
+            # Calculate duration_scale based on distance from current joints
+            cur_joints = self.joint_reader.get_most_recent_msg()
+            duration_scale = np.linalg.norm(joint_goal - cur_joints)
+            self.write(joint_goal, duration_scale)
+            assert len(joint_goal) == 7
     
     def reset(self, goal_joints):
         if self.arm_enabled:
@@ -157,3 +166,4 @@ class TiagoArms:
     #         rospy.sleep(delay_scale*5) # waiting for execution
     #         self._internal_state_pose, self._internal_state_quat = \
     #           self.arm_reader.get_transform(target_link=f'/arm_{self.side}_tool_link', base_link='/torso_lift_link') # assign internal states
+    

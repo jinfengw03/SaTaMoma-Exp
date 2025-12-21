@@ -5,9 +5,9 @@ import numpy as np
 from pynput import keyboard
 from std_msgs.msg import Header
 from control_msgs.msg  import JointTrajectoryControllerState
-from tiago_onboard.tiago_sys.utils.camera_utils import Camera
+from tiago_server.tiago_sys.utils.camera_utils import Camera
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
-from tiago_onboard.tiago_sys.utils.ros_utils import Publisher, Listener
+from tiago_server.tiago_sys.utils.ros_utils import Publisher, Listener
 
 
 class TiagoHead:

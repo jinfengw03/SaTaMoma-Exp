@@ -1,4 +1,4 @@
-from tiago_onboard.tiago_sys.oculus_teleop.configs.base_config import teleop_config
+from tiago_client.oculus_teleop.configs.base_config import teleop_config
 
 teleop_config.arm_left_controller = 'oculus'
 teleop_config.arm_right_controller = 'oculus'

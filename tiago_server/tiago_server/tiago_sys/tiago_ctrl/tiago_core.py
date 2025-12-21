@@ -1,11 +1,11 @@
 import time
 import rospy
-from tiago_onboard.tiago_sys.tiago_ctrl.tiago_head import TiagoHead
-from tiago_onboard.tiago_sys.tiago_ctrl.tiago_arms import TiagoArms
-from tiago_onboard.tiago_sys.tiago_ctrl.tiago_torso import TiagoTorso
-from tiago_onboard.tiago_sys.tiago_ctrl.tiago_head import LookAtFixedPoint
-from tiago_onboard.tiago_sys.tiago_ctrl.tiago_mobile_base import TiagoBaseVelocityControl
-from tiago_onboard.tiago_sys.tiago_ctrl.grippers import PALGripper, RobotiqGripper2F_140, RobotiqGripper2F_85
+from tiago_server.tiago_sys.tiago_ctrl.tiago_head import TiagoHead
+from tiago_server.tiago_sys.tiago_ctrl.tiago_arms import TiagoArms
+from tiago_server.tiago_sys.tiago_ctrl.tiago_torso import TiagoTorso
+from tiago_server.tiago_sys.tiago_ctrl.tiago_head import LookAtFixedPoint
+from tiago_server.tiago_sys.tiago_ctrl.tiago_mobile_base import TiagoBaseVelocityControl
+from tiago_server.tiago_sys.tiago_ctrl.grippers import PALGripper, RobotiqGripper2F_140, RobotiqGripper2F_85
 
 
 class Tiago:
@@ -71,11 +71,19 @@ class Tiago:
         for side in ['right', 'left']:
             if action.get(side) is None:
                 continue
-            arm_action = action[side][:6]
-            gripper_action = action[side][6]
-            self.arms[side].step(arm_action) # position delta + euler angle
-            if self.gripper[side] is not None:
-                self.gripper[side].step(gripper_action) # abs 
+            
+            if len(action[side]) == 8: # joint control: 7 joints + 1 gripper
+                joint_action = action[side][:7]
+                gripper_action = action[side][7]
+                self.arms[side].step_joints(joint_action)
+                if self.gripper[side] is not None:
+                    self.gripper[side].step(gripper_action)
+            else: # cartesian control: 6 delta + 1 gripper
+                arm_action = action[side][:6]
+                gripper_action = action[side][6]
+                self.arms[side].step(arm_action) # position delta + euler angle
+                if self.gripper[side] is not None:
+                    self.gripper[side].step(gripper_action) # abs 
         # head 
         if self.head_enabled:
             self.head.step(action) # TBD: ...

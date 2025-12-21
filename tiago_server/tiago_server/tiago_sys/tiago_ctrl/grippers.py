@@ -2,7 +2,7 @@ import rospy
 from std_msgs.msg import Header, Bool
 from control_msgs.msg  import JointTrajectoryControllerState
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
-from tiago_onboard.tiago_sys.utils.ros_utils import Listener, Publisher
+from tiago_server.tiago_sys.utils.ros_utils import Listener, Publisher
 
 # gripper command between 0.0-1.0
 class PALGripper:

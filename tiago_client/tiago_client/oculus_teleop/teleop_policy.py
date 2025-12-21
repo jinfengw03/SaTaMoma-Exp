@@ -1,6 +1,6 @@
-from tiago_onboard.tiago_sys.oculus_teleop import INTERFACE_MAP
-from tiago_onboard.tiago_sys.utils.general_utils import AttrDict
-from tiago_onboard.tiago_sys.oculus_teleop.teleop_core import BaseTeleopInterface, TeleopAction, TeleopObservation
+from tiago_client.oculus_teleop import INTERFACE_MAP
+from tiago_client.utils.general_utils import AttrDict
+from tiago_client.oculus_teleop.teleop_core import BaseTeleopInterface, TeleopAction, TeleopObservation
 
 
 class TeleopPolicy:

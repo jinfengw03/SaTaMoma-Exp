@@ -1,4 +1,4 @@
-from tiago_onboard.tiago_sys.utils.general_utils import AttrDict
+from tiago_client.utils.general_utils import AttrDict
 
 teleop_config = AttrDict(
     arm_left_controller=None,
