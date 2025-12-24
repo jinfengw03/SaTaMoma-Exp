@@ -2,12 +2,12 @@ import os
 import requests
 import numpy as np
 from collections import OrderedDict
-from tiago_client.tiago_client.utils.flask_comm import decode4json, encode2json, reconstruct_space_dict
-from tiago_client.tiago_client.oculus_teleop.teleop_policy import TeleopPolicy
-from tiago_client.tiago_client.oculus_teleop.teleop_core import TeleopObservation
-from tiago_client.tiago_client.utils.ik_solver import TiagoIK
-from tiago_client.tiago_client.utils.safety_filter import JointSafetyFilter
-from tiago_client.tiago_client.utils.transformations import quat_to_euler, euler_to_quat, add_angles
+from tiago_client.utils.flask_comm import decode4json, encode2json, reconstruct_space_dict
+from tiago_client.oculus_teleop.teleop_policy import TeleopPolicy
+from tiago_client.oculus_teleop.teleop_core import TeleopObservation
+from tiago_client.utils.ik_solver import TiagoIK
+from tiago_client.tiago_safety.safety_filter_right import JointSafetyFilter
+from tiago_client.utils.transformations import quat_to_euler, euler_to_quat, add_angles
 
 class TiagoClient:
     """

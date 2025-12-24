@@ -1,18 +1,18 @@
 import os
 import numpy as np
 from tracikpy import TracIKSolver
-from tiago_client.tiago_client.utils.transformations import quat_to_rmat
+from tiago_client.utils.transformations import quat_to_rmat
 
 class TiagoIK:
     def __init__(self, side='right'):
         self.side = side
-        self.urdf_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), '../urdf/tiago.urdf')
+        self.urdf_path = os.path.join('/home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client', f'urdf/tiago_{self.side}_arm.urdf')
         
         # Initialize IK Solver
         self.ik_solver = TracIKSolver(
             urdf_file=self.urdf_path,
             base_link="torso_lift_link",
-            tip_link=f"arm_{self.side}_tool_link",
+            tip_link=f"arm_{self.side}_7_link",
             timeout=0.025,
             epsilon=5e-4,
             solve_type="Distance"

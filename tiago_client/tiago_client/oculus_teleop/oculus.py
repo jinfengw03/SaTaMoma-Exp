@@ -1,4 +1,6 @@
+import os
 import time
+from typing import Dict
 import numpy as np
 from tiago_client.utils.general_utils import run_threaded_command
 from tiago_client.utils.transformations import quat_diff, quat_to_euler, rmat_to_quat
@@ -35,9 +37,18 @@ class OculusPolicy(BaseTeleopInterface):
                 "oculus_reader not installed! Please visit https://github.com/rail-berkeley/oculus_reader for installation instrucitons."
             )
         super().__init__(*args, **kwargs)
-        
-        # self.oculus_reader = oculus_reader.OculusReader(run=False) # usb-version
-        self.oculus_reader = oculus_reader.OculusReader(run=False, ip_address="192.168.0.140") # network-version
+        from oculus_reader.oculus_reader.reader import OculusReader
+
+        # Prefer explicit kwargs, then env vars, else fall back to None (USB like reader.py)
+        ip_cfg = kwargs.get('ip_address', None)
+        port_cfg = kwargs.get('port', None)
+        ip_env = os.getenv('OCULUS_IP', None)
+        port_env = os.getenv('OCULUS_PORT', None)
+        ip_address = ip_cfg if ip_cfg is not None else ip_env
+        port = int(port_cfg if port_cfg is not None else (port_env if port_env is not None else 5555))
+
+        # If ip_address is None, OculusReader will behave like reader.py (USB)
+        self.oculus_reader = OculusReader(run=False, ip_address=ip_address, port=port)
         
         self.vr_to_global_mat = {'right': np.eye(4), 'left': np.eye(4)}
         self.max_lin_vel = max_lin_vel
@@ -165,7 +176,7 @@ class OculusPolicy(BaseTeleopInterface):
             gripper_vel = gripper_vel * self.max_gripper_vel / gripper_vel_norm
         return lin_vel, rot_vel, gripper_vel
 
-    def _calculate_action(self, robot_obs: dict[str, np.ndarray], arm: str, is_filter=False) -> np.ndarray:
+    def _calculate_action(self, robot_obs: Dict[str, np.ndarray], arm: str, is_filter=False) -> np.ndarray:
 
         # read sensor
         if self.update_sensor[arm]:
@@ -225,7 +236,8 @@ class OculusPolicy(BaseTeleopInterface):
             eef_data = obs[arm]
             if eef_data is None:
                 continue
-            robot_obs = {'cartesian_position': eef_data[:-1], 'gripper_position': eef_data[-1]}
+            # Use full 7-element pose (x,y,z,qx,qy,qz,qw); gripper from VR buttons, not this pose.
+            robot_obs = {'cartesian_position': eef_data[:7], 'gripper_position': 0.0}
             if self._state[arm]["poses"] is not None:
                 action[arm] = self._calculate_action(robot_obs, arm, is_filter)
 

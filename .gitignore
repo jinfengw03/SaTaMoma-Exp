@@ -1,0 +1,8 @@
+.tiago_client/tiago_client/__pycache__/
+.tiago_client/tiago_client/oculus_teleop/__pycache__/
+.tiago_client/tiago_client/tiago_safety/__pycache__/
+.tiago_client/tiago_client/utils/__pycache__/
+tiago_client.egg-info/
+__pycache__/
+tiago_client/oculus_reader
+tiago_client/tiago_client/utils/tracikpy/

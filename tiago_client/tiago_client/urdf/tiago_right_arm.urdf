@@ -1,0 +1,342 @@
+<?xml version="1.0" ?>
+
+
+<robot name="tiago_right_arm" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <material name="Blue">
+    <color rgba="0.0 0.0 0.8 1.0"/>
+  </material>
+  <material name="Green">
+    <color rgba="0.0 0.8 0.0 1.0"/>
+  </material>
+  <material name="Grey">
+    <color rgba="0.7 0.7 0.7 1.0"/>
+  </material>
+  <material name="LightGrey">
+    <color rgba="0.9 0.9 0.9 1.0"/>
+  </material>
+  <material name="DarkGrey">
+    <color rgba="0.1 0.1 0.1 1.0"/>
+  </material>
+  <material name="Red">
+    <color rgba="0.8 0.0 0.0 1.0"/>
+  </material>
+  <material name="White">
+    <color rgba="1.0 1.0 1.0 1.0"/>
+  </material>
+  <material name="Yellow">
+    <color rgba="0.96 0.88 0.14 1.0"/>
+  </material>
+  <material name="Black">
+    <color rgba="0.0 0.0 0.0 1.0"/>
+  </material>
+  <material name="FlatBlack">
+    <color rgba="0.09 0.09 0.09 1.0"/>
+  </material>
+  <material name="Orange">
+    <color rgba="1.0 0.487 0.0 1.0"/>
+  </material>
+  <material name="pal/Orange">
+    <color rgba="0.91373 0.61568 0.29411 1.0"/>
+  </material>
+  <material name="pal/DarkGrey">
+    <color rgba="0.29804 0.29804 0.29804 1"/>
+  </material>
+
+  <link name="torso_lift_link">
+    <inertial>
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.04361 -0.00116 -0.17334"/>
+      <mass value="9.594213"/>
+      <!-- <inertia ixx="0.24487000000" ixy="-0.00145600000" ixz="-0.00974200000" iyy="0.24926900000" iyz="0.00828100000" izz="0.09039500000"/> -->
+      <inertia ixx="0.326395" ixy="-0.000844" ixz="-0.018905" iyy="0.235332" iyz="0.009042" izz="0.176168"/>
+    </inertial>
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="package://tiago_dual_description/meshes/torso/torso_lift_dual_arm.stl" scale="1 1 1"/>
+      </geometry>
+      <material name="White"/>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="package://tiago_description/meshes/torso/torso_lift_collision_core.dae" scale="1 1 1"/>
+      </geometry>
+      <material name="LightGrey"/>
+    </collision>
+    <!-- left shoulder collision-->
+    <collision>
+      <origin rpy="0 0 0" xyz="-0.131 0.17 -0.02556"/>
+      <geometry>
+        <mesh filename="package://tiago_description/meshes/torso/torso_lift_collision_shoulder.dae" scale="1 1 1"/>
+      </geometry>
+      <material name="LightGrey"/>
+    </collision>
+    <!-- right shoulder collision-->
+    <collision>
+      <origin rpy="0 0 0" xyz="-0.131 -0.19 -0.02556"/>
+      <geometry>
+        <mesh filename="package://tiago_description/meshes/torso/torso_lift_collision_shoulder.dae" scale="1 1 1"/>
+      </geometry>
+      <material name="LightGrey"/>
+    </collision>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="package://tiago_description/meshes/torso/torso_lift_collision_neck.dae" scale="1 1 1"/>
+      </geometry>
+      <material name="LightGrey"/>
+    </collision>
+  </link>
+
+  <link name="arm_right_1_link">
+    <inertial>
+      <!--<origin xyz="0.061191 ${reflect * -0.022397} -0.012835" rpy="0.00000 0.00000 0.00000"/>-->
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.061191 -0.022397 -0.012835"/>
+      <mass value="1.563428"/>
+      <inertia ixx="0.002471" ixy="-0.001809" ixz="-0.001202" iyy="0.006132" iyz="0.000494" izz="0.006704"/>
+    </inertial>
+    <!-- M90 module -->
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="package://tiago_description/meshes/arm/arm_1.stl" scale="1 -1 1"/>
+      </geometry>
+      <material name="White"/>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="package://tiago_description/meshes/arm/arm_1_collision.dae" scale="1 -1 1"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="arm_right_1_joint" type="revolute">
+    <parent link="torso_lift_link"/>
+    <child link="arm_right_1_link"/>
+    <origin rpy="0 0 -1.5707963267948966" xyz="0.02556 -0.19 -0.171"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="43.0" lower="-1.1780972450961724" upper="1.5707963267948966" velocity="1.95"/>
+    <dynamics damping="40.0" friction="1.0"/>
+    <safety_controller k_position="20" k_velocity="20" soft_lower_limit="-1.1080972450961724" soft_upper_limit="1.5007963267948965"/>
+  </joint>
+  <link name="arm_right_2_link">
+    <inertial>
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.030432 0.000229 -0.005942"/>
+      <mass value="1.800397"/>
+      <inertia ixx="0.001809" ixy="1.5e-05" ixz="0.000254" iyy="0.004333" iyz="1.4e-05" izz="0.004341"/>
+    </inertial>
+    <visual>
+      <!-- <origin xyz="0 0 0" rpy="${180 * deg_to_rad} ${0 * deg_to_rad} ${-90 * deg_to_rad}" /> -->
+      <origin rpy="0.0 0.0 0.0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="package://tiago_description/meshes/arm/arm_2.stl" scale="1 1 1"/>
+      </geometry>
+      <material name="DarkGrey"/>
+    </visual>
+    <collision>
+      <!-- <origin xyz="0 0 0" rpy="${180 * deg_to_rad} ${0 * deg_to_rad} ${-90 * deg_to_rad}" /> -->
+      <origin rpy="0.0 0.0 0.0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="package://tiago_description/meshes/arm/arm_2_collision.dae" scale="1 1 1"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="arm_right_2_joint" type="revolute">
+    <parent link="arm_right_1_link"/>
+    <child link="arm_right_2_link"/>
+    <origin rpy="-1.5707963267948966 0.0 0.0" xyz="0.125 -0.0195 -0.031"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="43.0" lower="-1.1780972450961724" upper="1.5707963267948966" velocity="1.95"/>
+    <dynamics damping="40.0" friction="1.0"/>
+    <safety_controller k_position="20" k_velocity="20" soft_lower_limit="-1.1080972450961724" soft_upper_limit="1.5007963267948965"/>
+  </joint>
+  <link name="arm_right_3_link">
+    <inertial>
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.007418 -0.004361 -0.134194"/>
+      <mass value="1.8"/>
+      <inertia ixx="0.019541" ixy="-0.000105" ixz="-0.001717" iyy="0.019936" iyz="0.000852" izz="0.002864"/>
+    </inertial>
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="package://tiago_description/meshes/arm/arm_3.stl" scale="1 1 1"/>
+      </geometry>
+      <material name="DarkGrey"/>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="package://tiago_description/meshes/arm/arm_3_collision.dae" scale="1 1 1"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="arm_right_3_joint" type="revolute">
+    <parent link="arm_right_2_link"/>
+    <child link="arm_right_3_link"/>
+    <origin rpy="-1.5707963267948966 0.0 1.5707963267948966" xyz="0.0895 0.0 -0.0015"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="26" lower="-0.7853981633974483" upper="3.9269908169872414" velocity="2.35"/>
+    <dynamics damping="40.0" friction="1.0"/>
+    <safety_controller k_position="20" k_velocity="20" soft_lower_limit="-0.7153981633974482" soft_upper_limit="3.8569908169872416"/>
+  </joint>
+  <!-- Elbow -->
+  <link name="arm_right_4_link">
+    <inertial>
+      <origin rpy="0.00000 0.00000 0.00000" xyz="-0.095658 0.014666 0.018133"/>
+      <mass value="1.432697"/>
+      <inertia ixx="0.002040" ixy="0.000725" ixz="-0.00115" iyy="0.008424" iyz="-0.000204" izz="0.008686"/>
+    </inertial>
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="package://tiago_description/meshes/arm/arm_4.stl" scale="1 1 1"/>
+      </geometry>
+      <material name="DarkGrey"/>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="package://tiago_description/meshes/arm/arm_4_collision.dae" scale="1 1 1"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="arm_right_4_joint" type="revolute">
+    <parent link="arm_right_3_link"/>
+    <child link="arm_right_4_link"/>
+    <origin rpy="-1.5707963267948966 -1.5707963267948966 0.0" xyz="-0.02 -0.027 -0.222"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="26" lower="-0.39269908169872414" upper="2.356194490192345" velocity="2.35"/>
+    <dynamics damping="40.0" friction="1.0"/>
+    <safety_controller k_position="20" k_velocity="20" soft_lower_limit="-0.32269908169872413" soft_upper_limit="2.286194490192345"/>
+  </joint>
+  <gazebo reference="arm_right_1_link">
+    <mu1>0.9</mu1>
+    <mu2>0.9</mu2>
+    <material>Gazebo/DarkGrey</material>
+  </gazebo>
+  <gazebo reference="arm_right_2_link">
+    <mu1>0.9</mu1>
+    <mu2>0.9</mu2>
+    <material>Gazebo/DarkGrey</material>
+  </gazebo>
+  <gazebo reference="arm_right_3_link">
+    <mu1>0.9</mu1>
+    <mu2>0.9</mu2>
+    <material>Gazebo/DarkGrey</material>
+  </gazebo>
+  <gazebo reference="arm_right_4_link">
+    <mu1>0.9</mu1>
+    <mu2>0.9</mu2>
+    <material>Gazebo/DarkGrey</material>
+  </gazebo>
+  <gazebo reference="arm_right_1_joint">
+    <implicitSpringDamper>1</implicitSpringDamper>
+  </gazebo>
+  <gazebo reference="arm_right_2_joint">
+    <implicitSpringDamper>1</implicitSpringDamper>
+  </gazebo>
+  <gazebo reference="arm_right_3_joint">
+    <implicitSpringDamper>1</implicitSpringDamper>
+  </gazebo>
+  <gazebo reference="arm_right_4_joint">
+    <implicitSpringDamper>1</implicitSpringDamper>
+  </gazebo>
+  <!-- Wrist-->
+  <link name="arm_right_5_link">
+    <inertial>
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.001078 -0.000151 -0.077173"/>
+      <mass value="1.655819"/>
+      <inertia ixx="0.00613800000" ixy="-0.00000400000" ixz="0.00015600000" iyy="0.00564000000" iyz="0.00002200000" izz="0.00179700000"/>
+    </inertial>
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="package://tiago_description/meshes/arm/arm_5-wrist-2010.stl" scale="1 1 1"/>
+      </geometry>
+      <material name="LightGrey"/>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="package://tiago_description/meshes/arm/arm_5_collision-wrist-2010.dae" scale="1 1 1"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="arm_right_5_joint" type="revolute">
+    <parent link="arm_right_4_link"/>
+    <child link="arm_right_5_link"/>
+    <origin rpy="1.5707963267948966 -1.5707963267948966 -1.5707963267948966" xyz="-0.162 0.02 0.027"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="3" lower="-2.0943951023931953" upper="2.0943951023931953" velocity="1.95"/>
+    <dynamics damping="1.0" friction="1.0"/>
+    <safety_controller k_position="20" k_velocity="20" soft_lower_limit="-2.0743951023931952" soft_upper_limit="2.0743951023931952"/>
+  </joint>
+  <link name="arm_right_6_link">
+    <inertial>
+      <origin rpy="0.00000 0.00000 0.00000" xyz="-0.000153 -0.003122 0.000183"/>
+      <mass value="0.370063"/>
+      <inertia ixx="0.00021500000" ixy="0.00000000000" ixz="0.00000000000" iyy="0.00017000000" iyz="0.00000200000" izz="0.00017400000"/>
+    </inertial>
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="package://tiago_description/meshes/arm/arm_6-wrist-2010.stl" scale="1 1 1"/>
+      </geometry>
+      <material name="LightGrey"/>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="package://tiago_description/meshes/arm/arm_6_collision-wrist-2010.dae" scale="1 1 1"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="arm_right_6_joint" type="revolute">
+    <parent link="arm_right_5_link"/>
+    <child link="arm_right_6_link"/>
+    <origin rpy="0.0 -1.5707963267948966 -1.5707963267948966" xyz="0 0 0.15"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="6.6" lower="-1.413716694115407" upper="1.413716694115407" velocity="1.76"/>
+    <dynamics damping="1.0" friction="1.0"/>
+    <safety_controller k_position="20" k_velocity="20" soft_lower_limit="-1.3937166941154069" soft_upper_limit="1.3937166941154069"/>
+  </joint>
+  <link name="arm_right_7_link">
+    <inertial>
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.000010 -0.000003 -0.007774"/>
+      <mass value="0.234252"/>
+      <inertia ixx="0.00014200000" ixy="0.00000000000" ixz="0.00000000000" iyy="0.00011300000" iyz="0.00000000000" izz="0.00005200000"/>
+    </inertial>
+  </link>
+  <joint name="arm_right_7_joint" type="revolute">
+    <parent link="arm_right_6_link"/>
+    <child link="arm_right_7_link"/>
+    <origin rpy="1.5707963267948966 0.0 1.5707963267948966" xyz="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="6.6" lower="-2.0943951023931953" upper="2.0943951023931953" velocity="1.76"/>
+    <dynamics damping="1.0" friction="1.0"/>
+    <safety_controller k_position="20" k_velocity="20" soft_lower_limit="-2.0743951023931952" soft_upper_limit="2.0743951023931952"/>
+  </joint>
+  <gazebo reference="arm_right_5_link">
+    <mu1>0.9</mu1>
+    <mu2>0.9</mu2>
+  </gazebo>
+  <gazebo reference="arm_right_6_link">
+    <mu1>0.9</mu1>
+    <mu2>0.9</mu2>
+  </gazebo>
+  <gazebo reference="arm_right_7_link">
+    <mu1>0.9</mu1>
+    <mu2>0.9</mu2>
+  </gazebo>
+  <gazebo reference="arm_right_5_joint">
+    <implicitSpringDamper>1</implicitSpringDamper>
+  </gazebo>
+  <gazebo reference="arm_right_6_joint">
+    <implicitSpringDamper>1</implicitSpringDamper>
+  </gazebo>
+  <gazebo reference="arm_right_7_joint">
+    <implicitSpringDamper>1</implicitSpringDamper>
+    <provideFeedback>1</provideFeedback>
+  </gazebo>
+
+</robot>

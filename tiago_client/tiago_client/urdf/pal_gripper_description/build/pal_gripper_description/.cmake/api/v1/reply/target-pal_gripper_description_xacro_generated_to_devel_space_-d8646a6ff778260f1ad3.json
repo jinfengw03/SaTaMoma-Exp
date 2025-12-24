@@ -1,0 +1,59 @@
+{
+	"backtrace" : 5,
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"add_custom_target",
+			"include",
+			"find_package"
+		],
+		"files" : 
+		[
+			"/home/jiachenli/miniconda3/envs/ros39/share/xacro/cmake/xacro-extras.cmake",
+			"/home/jiachenli/miniconda3/envs/ros39/share/xacro/cmake/xacroConfig.cmake",
+			"CMakeLists.txt"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 2
+			},
+			{
+				"command" : 2,
+				"file" : 2,
+				"line" : 5,
+				"parent" : 0
+			},
+			{
+				"file" : 1,
+				"parent" : 1
+			},
+			{
+				"command" : 1,
+				"file" : 1,
+				"line" : 224,
+				"parent" : 2
+			},
+			{
+				"file" : 0,
+				"parent" : 3
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 1,
+				"parent" : 4
+			}
+		]
+	},
+	"id" : "pal_gripper_description_xacro_generated_to_devel_space_::@6890427a1f51a3e7e1df",
+	"name" : "pal_gripper_description_xacro_generated_to_devel_space_",
+	"paths" : 
+	{
+		"build" : ".",
+		"source" : "."
+	},
+	"sources" : [],
+	"type" : "UTILITY"
+}

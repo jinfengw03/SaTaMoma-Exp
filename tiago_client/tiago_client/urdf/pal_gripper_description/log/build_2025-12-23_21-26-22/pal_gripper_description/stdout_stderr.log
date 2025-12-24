@@ -1,0 +1,67 @@
+-- The C compiler identification is GNU 11.2.0
+-- The CXX compiler identification is GNU 11.2.0
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /home/jiachenli/miniconda3/envs/ros39/bin/x86_64-conda-linux-gnu-cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /home/jiachenli/miniconda3/envs/ros39/bin/x86_64-conda-linux-gnu-c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Found ament_cmake_auto: 0.9.12 (/opt/ros/foxy/share/ament_cmake_auto/cmake)
+-- Found PythonInterp: /home/jiachenli/miniconda3/envs/ros39/bin/python3 (found suitable version "3.9.15", minimum required is "3") 
+-- Using PYTHON_EXECUTABLE: /home/jiachenli/miniconda3/envs/ros39/bin/python3
+/opt/ros/foxy/lib/python3.8/site-packages/ament_package/__init__.py:19: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+-- Found ament_lint_auto: 0.9.8 (/opt/ros/foxy/share/ament_lint_auto/cmake)
+-- Added test 'copyright' to check source files copyright and LICENSE
+-- Added test 'cppcheck' to perform static code analysis on C / C++ code
+-- Configured cppcheck include dirs: 
+-- Configured cppcheck exclude dirs and/or files: 
+-- Added test 'cpplint' to check C / C++ code against the Google style
+-- Configured cpplint exclude dirs and/or files: 
+-- Added test 'lint_cmake' to check CMake code style
+-- Added test 'uncrustify' to check C / C++ code style
+-- Configured uncrustify additional arguments: 
+-- Added test 'xmllint' to check XML markup files
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pal_gripper_description/build/pal_gripper_description
+Built target pal_gripper_description_xacro_generated_to_devel_space_
+-- Install configuration: ""
+-- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pal_gripper_description/install/pal_gripper_description/share/pal_gripper_description/gazebo
+-- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pal_gripper_description/install/pal_gripper_description/share/pal_gripper_description/gazebo/gazebo.urdf.xacro
+-- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pal_gripper_description/install/pal_gripper_description/share/pal_gripper_description/meshes
+-- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pal_gripper_description/install/pal_gripper_description/share/pal_gripper_description/meshes/gripper_link.stl
+-- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pal_gripper_description/install/pal_gripper_description/share/pal_gripper_description/meshes/gripper_finger_link.stl
+-- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pal_gripper_description/install/pal_gripper_description/share/pal_gripper_description/meshes/gripper_link_collision.stl
+-- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pal_gripper_description/install/pal_gripper_description/share/pal_gripper_description/meshes/gripper_finger_link_collision.stl
+-- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pal_gripper_description/install/pal_gripper_description/share/pal_gripper_description/robots
+-- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pal_gripper_description/install/pal_gripper_description/share/pal_gripper_description/robots/upload_gripper.launch
+-- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pal_gripper_description/install/pal_gripper_description/share/pal_gripper_description/robots/upload.launch
+-- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pal_gripper_description/install/pal_gripper_description/share/pal_gripper_description/robots/gripper_test.urdf.xacro
+-- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pal_gripper_description/install/pal_gripper_description/share/pal_gripper_description/urdf
+-- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pal_gripper_description/install/pal_gripper_description/share/pal_gripper_description/urdf/gripper.urdf.xacro
+-- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pal_gripper_description/install/pal_gripper_description/share/pal_gripper_description/urdf/gripper.transmission.xacro
+-- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pal_gripper_description/install/pal_gripper_description/share/pal_gripper_description/urdf/gripper.ros2_control.xacro
+-- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pal_gripper_description/install/pal_gripper_description/share/pal_gripper_description/urdf/gripper.gazebo.xacro
+-- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pal_gripper_description/install/pal_gripper_description/share/pal_gripper_description/ros2_control
+-- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pal_gripper_description/install/pal_gripper_description/share/pal_gripper_description/ros2_control/ros2_control.urdf.xacro
+-- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pal_gripper_description/install/pal_gripper_description/share/ament_index/resource_index/package_run_dependencies/pal_gripper_description
+-- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pal_gripper_description/install/pal_gripper_description/share/ament_index/resource_index/parent_prefix_path/pal_gripper_description
+-- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pal_gripper_description/install/pal_gripper_description/share/pal_gripper_description/environment/ament_prefix_path.sh
+-- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pal_gripper_description/install/pal_gripper_description/share/pal_gripper_description/environment/ament_prefix_path.dsv
+-- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pal_gripper_description/install/pal_gripper_description/share/pal_gripper_description/environment/path.sh
+-- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pal_gripper_description/install/pal_gripper_description/share/pal_gripper_description/environment/path.dsv
+-- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pal_gripper_description/install/pal_gripper_description/share/pal_gripper_description/local_setup.bash
+-- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pal_gripper_description/install/pal_gripper_description/share/pal_gripper_description/local_setup.sh
+-- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pal_gripper_description/install/pal_gripper_description/share/pal_gripper_description/local_setup.zsh
+-- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pal_gripper_description/install/pal_gripper_description/share/pal_gripper_description/local_setup.dsv
+-- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pal_gripper_description/install/pal_gripper_description/share/pal_gripper_description/package.dsv
+-- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pal_gripper_description/install/pal_gripper_description/share/ament_index/resource_index/packages/pal_gripper_description
+-- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pal_gripper_description/install/pal_gripper_description/share/pal_gripper_description/cmake/ament_cmake_export_dependencies-extras.cmake
+-- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pal_gripper_description/install/pal_gripper_description/share/pal_gripper_description/cmake/pal_gripper_descriptionConfig.cmake
+-- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pal_gripper_description/install/pal_gripper_description/share/pal_gripper_description/cmake/pal_gripper_descriptionConfig-version.cmake
+-- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pal_gripper_description/install/pal_gripper_description/share/pal_gripper_description/package.xml

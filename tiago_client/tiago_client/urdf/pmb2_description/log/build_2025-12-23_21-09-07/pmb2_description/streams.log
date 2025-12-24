@@ -1,0 +1,135 @@
+[0.009s] Invoking command in '/home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/build/pmb2_description': CMAKE_PREFIX_PATH=/opt/ros/foxy:${CMAKE_PREFIX_PATH} CONDA_PROMPT_MODIFIER=(ros39) /home/jiachenli/miniconda3/envs/ros39/bin/cmake /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description -DCMAKE_INSTALL_PREFIX=/home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description
+[0.107s] -- The C compiler identification is GNU 11.2.0
+[0.156s] -- The CXX compiler identification is GNU 11.2.0
+[0.163s] -- Detecting C compiler ABI info
+[0.196s] -- Detecting C compiler ABI info - done
+[0.202s] -- Check for working C compiler: /home/jiachenli/miniconda3/envs/ros39/bin/x86_64-conda-linux-gnu-cc - skipped
+[0.204s] -- Detecting C compile features
+[0.204s] -- Detecting C compile features - done
+[0.206s] -- Detecting CXX compiler ABI info
+[0.245s] -- Detecting CXX compiler ABI info - done
+[0.250s] -- Check for working CXX compiler: /home/jiachenli/miniconda3/envs/ros39/bin/x86_64-conda-linux-gnu-c++ - skipped
+[0.251s] -- Detecting CXX compile features
+[0.251s] -- Detecting CXX compile features - done
+[0.254s] -- Found ament_cmake_auto: 0.9.12 (/opt/ros/foxy/share/ament_cmake_auto/cmake)
+[0.268s] -- Found PythonInterp: /home/jiachenli/miniconda3/envs/ros39/bin/python3 (found suitable version "3.9.15", minimum required is "3") 
+[0.268s] -- Using PYTHON_EXECUTABLE: /home/jiachenli/miniconda3/envs/ros39/bin/python3
+[0.325s] /opt/ros/foxy/lib/python3.8/site-packages/ament_package/__init__.py:19: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+[0.325s]   import pkg_resources
+[0.426s] -- Found ament_lint_auto: 0.9.8 (/opt/ros/foxy/share/ament_lint_auto/cmake)
+[0.440s] -- Found python_cmake_module: 0.8.1 (/opt/ros/foxy/share/python_cmake_module/cmake)
+[0.447s] -- Found PythonInterp: /home/jiachenli/miniconda3/envs/ros39/bin/python3 (found suitable version "3.9.15", minimum required is "3.5") 
+[0.450s] -- Found PythonLibs: /home/jiachenli/miniconda3/envs/ros39/lib/libpython3.9.so (found suitable version "3.9.15", minimum required is "3.5") 
+[0.450s] -- Using PYTHON_EXECUTABLE: /home/jiachenli/miniconda3/envs/ros39/bin/python3
+[0.451s] -- Using PYTHON_INCLUDE_DIRS: /home/jiachenli/miniconda3/envs/ros39/include/python3.9
+[0.451s] -- Using PYTHON_LIBRARIES: /home/jiachenli/miniconda3/envs/ros39/lib/libpython3.9.so
+[0.459s] -- Found PythonExtra: .so  
+[0.477s] [33mCMake Warning at /opt/ros/foxy/share/ament_cmake_pytest/cmake/ament_add_pytest_test.cmake:77 (message):
+[0.477s]   The Python module 'pytest' was not found, pytests can not be run (e.g.  on
+[0.477s]   Ubuntu/Debian install the package 'python3-pytest')
+[0.477s] Call Stack (most recent call first):
+[0.477s]   CMakeLists.txt:24 (ament_add_pytest_test)
+[0.477s] 
+[0.477s] [0m
+[0.550s] -- Added test 'copyright' to check source files copyright and LICENSE
+[0.554s] -- Added test 'cppcheck' to perform static code analysis on C / C++ code
+[0.554s] -- Configured cppcheck include dirs: 
+[0.554s] -- Configured cppcheck exclude dirs and/or files: 
+[0.556s] -- Added test 'cpplint' to check C / C++ code against the Google style
+[0.556s] -- Configured cpplint exclude dirs and/or files: 
+[0.557s] -- Added test 'flake8' to check Python code syntax and style conventions
+[0.558s] -- Added test 'lint_cmake' to check CMake code style
+[0.559s] -- Added test 'pep257' to check Python code against some of the style conventions in PEP 257
+[0.562s] -- Added test 'uncrustify' to check C / C++ code style
+[0.562s] -- Configured uncrustify additional arguments: 
+[0.562s] -- Added test 'xmllint' to check XML markup files
+[0.563s] -- Configuring done
+[0.565s] -- Generating done
+[0.566s] -- Build files have been written to: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/build/pmb2_description
+[0.568s] Invoked command in '/home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/build/pmb2_description' returned '0': CMAKE_PREFIX_PATH=/opt/ros/foxy:${CMAKE_PREFIX_PATH} CONDA_PROMPT_MODIFIER=(ros39) /home/jiachenli/miniconda3/envs/ros39/bin/cmake /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description -DCMAKE_INSTALL_PREFIX=/home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description
+[0.570s] Invoking command in '/home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/build/pmb2_description': CMAKE_PREFIX_PATH=/opt/ros/foxy:${CMAKE_PREFIX_PATH} CONDA_PROMPT_MODIFIER=(ros39) /home/jiachenli/miniconda3/envs/ros39/bin/cmake --build /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/build/pmb2_description -- -j32 -l32
+[0.584s] Invoked command in '/home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/build/pmb2_description' returned '0': CMAKE_PREFIX_PATH=/opt/ros/foxy:${CMAKE_PREFIX_PATH} CONDA_PROMPT_MODIFIER=(ros39) /home/jiachenli/miniconda3/envs/ros39/bin/cmake --build /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/build/pmb2_description -- -j32 -l32
+[0.592s] Invoking command in '/home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/build/pmb2_description': CMAKE_PREFIX_PATH=/opt/ros/foxy:${CMAKE_PREFIX_PATH} CONDA_PROMPT_MODIFIER=(ros39) /home/jiachenli/miniconda3/envs/ros39/bin/cmake --install /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/build/pmb2_description
+[0.596s] -- Install configuration: ""
+[0.596s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/environment/pythonpath.sh
+[0.596s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/environment/pythonpath.dsv
+[0.596s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/lib/python3.9/site-packages/pmb2_description
+[0.596s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/lib/python3.9/site-packages/pmb2_description/launch_arguments.py
+[0.596s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/lib/python3.9/site-packages/pmb2_description/__init__.py
+[0.618s] Listing '/home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/lib/python3.9/site-packages/pmb2_description'...
+[0.618s] Compiling '/home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/lib/python3.9/site-packages/pmb2_description/__init__.py'...
+[0.618s] Compiling '/home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/lib/python3.9/site-packages/pmb2_description/launch_arguments.py'...
+[0.621s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/rviz
+[0.621s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/rviz/pmb2.rviz
+[0.621s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/launch
+[0.621s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/launch/robot_state_publisher.launch.py
+[0.621s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/launch/show.launch.py
+[0.621s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/meshes
+[0.621s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/meshes/wheels
+[0.621s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/meshes/wheels/high_resolution
+[0.621s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/meshes/wheels/high_resolution/caster_2.stl
+[0.621s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/meshes/wheels/high_resolution/wheel.stl
+[0.621s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/meshes/wheels/high_resolution/caster_1.stl
+[0.621s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/meshes/wheels/caster_2.stl
+[0.622s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/meshes/wheels/wheel.stl
+[0.622s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/meshes/wheels/caster_1.stl
+[0.622s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/meshes/base
+[0.622s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/meshes/base/high_resolution
+[0.622s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/meshes/base/high_resolution/base_collision.stl
+[0.622s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/meshes/base/high_resolution/base.stl
+[0.623s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/meshes/base/base_dock_link.stl
+[0.623s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/meshes/base/base_collision.dae
+[0.623s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/meshes/base/base.stl
+[0.624s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/meshes/base/base_ring.stl
+[0.624s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/meshes/dock
+[0.624s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/meshes/dock/dock.stl
+[0.624s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/meshes/dock/dock_collision.stl
+[0.624s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/meshes/cameras_add_on
+[0.624s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/meshes/cameras_add_on/cameras_add_on.stl
+[0.624s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/meshes/cameras_add_on/cameras_add_on_collision.stl
+[0.624s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/meshes/objects
+[0.624s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/meshes/objects/cover.stl
+[0.624s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/meshes/objects/high_resolution
+[0.624s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/meshes/objects/high_resolution/cover.stl
+[0.624s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/meshes/objects/antenna.stl
+[0.625s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/config
+[0.625s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/config/pmb2_configuration.yaml
+[0.625s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/robots
+[0.625s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/robots/pmb2.urdf.xacro
+[0.625s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/ros2_control
+[0.625s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/ros2_control/ros2_control.urdf.xacro
+[0.625s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/ros2_control/gazebo_controller_manager_cfg.yaml
+[0.625s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/urdf
+[0.625s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/urdf/wheels
+[0.625s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/urdf/wheels/wheel.urdf.xacro
+[0.625s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/urdf/wheels/caster.gazebo.xacro
+[0.625s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/urdf/wheels/wheel.gazebo.xacro
+[0.625s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/urdf/wheels/caster.urdf.xacro
+[0.625s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/urdf/wheels/wheel.ros2_control.xacro
+[0.626s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/urdf/base
+[0.626s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/urdf/base/base_sensors.urdf.xacro
+[0.626s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/urdf/base/base.urdf.xacro
+[0.626s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/urdf/base/base.gazebo.xacro
+[0.626s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/urdf/dock
+[0.626s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/urdf/dock/dock.urdf.xacro
+[0.626s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/urdf/cameras_add_on
+[0.626s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/urdf/cameras_add_on/cameras_add_on.urdf.xacro
+[0.626s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/urdf/objects
+[0.626s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/urdf/objects/antenna.urdf.xacro
+[0.626s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/urdf/objects/cover.urdf.xacro
+[0.626s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/ament_index/resource_index/package_run_dependencies/pmb2_description
+[0.626s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/ament_index/resource_index/parent_prefix_path/pmb2_description
+[0.626s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/environment/ament_prefix_path.sh
+[0.627s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/environment/ament_prefix_path.dsv
+[0.627s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/environment/path.sh
+[0.627s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/environment/path.dsv
+[0.627s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/local_setup.bash
+[0.627s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/local_setup.sh
+[0.628s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/local_setup.zsh
+[0.628s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/local_setup.dsv
+[0.628s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/package.dsv
+[0.628s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/ament_index/resource_index/packages/pmb2_description
+[0.628s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/cmake/pmb2_descriptionConfig.cmake
+[0.628s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/cmake/pmb2_descriptionConfig-version.cmake
+[0.628s] -- Installing: /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/install/pmb2_description/share/pmb2_description/package.xml
+[0.628s] Invoked command in '/home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/build/pmb2_description' returned '0': CMAKE_PREFIX_PATH=/opt/ros/foxy:${CMAKE_PREFIX_PATH} CONDA_PROMPT_MODIFIER=(ros39) /home/jiachenli/miniconda3/envs/ros39/bin/cmake --install /home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pmb2_description/build/pmb2_description

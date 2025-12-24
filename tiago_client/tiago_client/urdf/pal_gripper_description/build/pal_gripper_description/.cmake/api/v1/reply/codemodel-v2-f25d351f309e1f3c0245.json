@@ -1,0 +1,79 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"hasInstallRule" : true,
+					"jsonFile" : "directory-.-2533793b0f3785c5d864.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.8"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2
+					]
+				}
+			],
+			"name" : "",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "pal_gripper_description",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "pal_gripper_description_uninstall::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-pal_gripper_description_uninstall-893e1f24c36ab385f060.json",
+					"name" : "pal_gripper_description_uninstall",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "pal_gripper_description_xacro_generated_to_devel_space_::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-pal_gripper_description_xacro_generated_to_devel_space_-d8646a6ff778260f1ad3.json",
+					"name" : "pal_gripper_description_xacro_generated_to_devel_space_",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "uninstall::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-uninstall-5805487a857d842a8870.json",
+					"name" : "uninstall",
+					"projectIndex" : 0
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "/home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pal_gripper_description/build/pal_gripper_description",
+		"source" : "/home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client/urdf/pal_gripper_description"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 4
+	}
+}

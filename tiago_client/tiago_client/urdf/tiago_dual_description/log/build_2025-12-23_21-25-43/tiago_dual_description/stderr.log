@@ -1,0 +1,9 @@
+/opt/ros/foxy/lib/python3.8/site-packages/ament_package/__init__.py:19: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+[33mCMake Warning at /opt/ros/foxy/share/ament_cmake_pytest/cmake/ament_add_pytest_test.cmake:77 (message):
+  The Python module 'pytest' was not found, pytests can not be run (e.g.  on
+  Ubuntu/Debian install the package 'python3-pytest')
+Call Stack (most recent call first):
+  CMakeLists.txt:24 (ament_add_pytest_test)
+
+[0m

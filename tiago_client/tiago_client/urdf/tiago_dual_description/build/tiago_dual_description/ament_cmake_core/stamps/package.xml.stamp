@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+<package format="3">
+
+  <name>tiago_dual_description</name>
+  <version>2.15.2</version>
+  <description>This package contains the description (mechanical, kinematic, visual,
+      etc.) of the TIAGO robot.  The files in this package are parsed and used by
+      a variety of other components.  Most users will not interact directly
+      with this package.</description>
+  <maintainer email="jordan.palacios@pal-robotics.com">Jordan Palacios</maintainer>
+  <author email="david.terkuile@pal-robotics.com">David ter Kuile</author>
+  <maintainer email="david.terkuile@pal-robotics.com">David ter Kuile</maintainer>
+  <license>Apache License 2.0</license>
+
+  <url type="website">https://github.com/pal-robotics/tiago_dual_simulation</url>
+
+  <buildtool_depend>ament_cmake_auto</buildtool_depend>
+  <buildtool_depend>ament_cmake_python</buildtool_depend>
+  <build_depend condition="$PAL_DISTRO >= alum">pal_module_cmake</build_depend>
+
+  <exec_depend>xacro</exec_depend>
+  <exec_depend>pmb2_description</exec_depend>
+  <exec_depend>tiago_description</exec_depend>
+  <exec_depend>pal_hey5_description</exec_depend>
+  <exec_depend>pal_gripper_description</exec_depend>
+  <exec_depend>pal_robotiq_description</exec_depend>
+  <exec_depend>robot_state_publisher</exec_depend>
+
+  <test_depend>ament_cmake_pytest</test_depend>
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+  <test_depend>launch_testing_ament_cmake</test_depend>
+  <test_depend>urdf_test</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

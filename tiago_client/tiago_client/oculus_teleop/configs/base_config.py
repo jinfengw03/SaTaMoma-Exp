@@ -7,7 +7,11 @@ teleop_config = AttrDict(
     torso_controller=None,
     use_oculus=False,
     interface_kwargs=AttrDict(
-        oculus={},
+        oculus={
+            # Set these if you want network mode; leave None to use USB like reader.py
+            'ip_address': None,
+            'port': 5555,
+        },
         vision={},
         mobile_phone={},
         spacemouse={},

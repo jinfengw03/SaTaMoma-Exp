@@ -7,4 +7,4 @@ def try_import(module, class_name, interface_name):
     except ImportError as e:
         print(e)
 
-try_import('tiago_onboard.tiago_sys.oculus_teleop.oculus', 'OculusPolicy', 'oculus')
+try_import('tiago_client.oculus_teleop.oculus', 'OculusPolicy', 'oculus')
