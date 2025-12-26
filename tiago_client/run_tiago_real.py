@@ -1,6 +1,6 @@
 import time
 import numpy as np
-from tiago_client.tiago_client.tiago_client import TiagoClient
+from tiago_client.tiago_client import TiagoClient
 
 def main():
     # Initialize the real robot client

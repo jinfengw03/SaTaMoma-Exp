@@ -100,11 +100,15 @@ class TiagoEnv:
         return act_space
 
     def _state(self):
+        def _get_arm_joints(side):
+            joints = self.tiago.arms[side].joint_reader.get_most_recent_msg()
+            return np.array(joints) if joints is not None else np.zeros(7)
+
         states = AttrDict({
             'left': np.r_[np.array(self.tiago.arms['left'].arm_pose), np.array(self.tiago.left_gripper_pos)],
             'right': np.r_[np.array(self.tiago.arms['right'].arm_pose), np.array(self.tiago.right_gripper_pos)],
-            'left_joints': np.array(self.tiago.arms['left'].arm_joints),
-            'right_joints': np.array(self.tiago.arms['right'].arm_joints),
+            'left_joints': _get_arm_joints('left'),
+            'right_joints': _get_arm_joints('right'),
             'base_pose': np.array(self.tiago.base.get_delta_pose()),
             'base_velocity': np.array(self.tiago.base.get_velocity()),
             'torso': np.array(self.tiago.torso.get_torso_extension()),
@@ -115,11 +119,15 @@ class TiagoEnv:
         return states
 
     def _state_wo_vis(self):
+        def _get_arm_joints(side):
+            joints = self.tiago.arms[side].joint_reader.get_most_recent_msg()
+            return np.array(joints) if joints is not None else np.zeros(7)
+
         states = AttrDict({
             'left': np.r_[np.array(self.tiago.arms['left'].arm_pose), np.array(self.tiago.left_gripper_pos)],
             'right': np.r_[np.array(self.tiago.arms['right'].arm_pose), np.array(self.tiago.right_gripper_pos)],
-            'left_joints': np.array(self.tiago.arms['left'].arm_joints),
-            'right_joints': np.array(self.tiago.arms['right'].arm_joints),
+            'left_joints': _get_arm_joints('left'),
+            'right_joints': _get_arm_joints('right'),
             'base_pose': np.array(self.tiago.base.get_delta_pose()),
             'base_velocity': np.array(self.tiago.base.get_velocity()),
             'torso': np.array(self.tiago.torso.get_torso_extension()),
