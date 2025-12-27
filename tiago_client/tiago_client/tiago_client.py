@@ -30,7 +30,7 @@ class TiagoClient:
         # Initialize Teleop, IK, and Safety
         self.teleop = None
         if use_teleop:
-            from tiago_client.tiago_client.oculus_teleop.configs.only_vr import teleop_config
+            from tiago_client.oculus_teleop.configs.only_vr import teleop_config
             self.teleop = TeleopPolicy(teleop_config)
             self.teleop.start()
             
@@ -41,13 +41,35 @@ class TiagoClient:
             }
             
             # Path to URDF (assuming it's in the same package)
-            urdf_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'urdf/tiago.urdf')
+            urdf_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'urdf')
+            urdf_right_arm_path = os.path.join(urdf_dir, 'tiago_right_arm.urdf')
+            urdf_left_arm_path = os.path.join(urdf_dir, 'tiago_left_arm.urdf')
             self.safety_filters = {
-                'right': JointSafetyFilter(urdf_path, side='right'),
-                'left': JointSafetyFilter(urdf_path, side='left')
+                'right': JointSafetyFilter(urdf_right_arm_path, side='right'),
+                'left': JointSafetyFilter(urdf_left_arm_path, side='left')
             }
         
         print("[TiagoClient] Connection established and spaces initialized.")
+
+    @staticmethod
+    def _summarize_payload(payload):
+        summary = {}
+        if not isinstance(payload, dict):
+            return f"non-dict payload type={type(payload)}"
+        for k, v in payload.items():
+            try:
+                if isinstance(v, np.ndarray):
+                    flat = v.reshape(-1)
+                    preview = flat[:3].tolist()
+                    summary[k] = f"ndarray shape={v.shape} dtype={v.dtype} preview={preview}"
+                elif isinstance(v, (list, tuple)):
+                    preview = list(v[:3]) if len(v) >= 3 else list(v)
+                    summary[k] = f"list len={len(v)} preview={preview}"
+                else:
+                    summary[k] = f"{type(v).__name__} value={v}"
+            except Exception as exc:  # pragma: no cover - defensive
+                summary[k] = f"error summarizing: {exc}"
+        return summary
 
     def _obtain_state_space(self):
         data = requests.post(self.url + "tiago_get_state_space").json()
@@ -77,10 +99,12 @@ class TiagoClient:
         :return: (observation, info)
         """
         action_json = encode2json(action)
+        print("[TiagoClient] -> /tiago_step action summary:", self._summarize_payload(action))
         recept_json = requests.post(
             self.url + "tiago_step", 
             json={'action': action_json}
         ).json()
+        print("[TiagoClient] <- /tiago_step response keys:", list(recept_json.keys()))
         
         obs = decode4json(recept_json['obs'])
         info = decode4json(recept_json['info'])
@@ -125,11 +149,16 @@ class TiagoClient:
         state = self.get_state_wo_vis()
         
         # Prepare observation for teleop policy
+        torso_val = state.get('torso')
+        if isinstance(torso_val, np.ndarray):
+            torso_val = float(torso_val.reshape(-1)[0]) if torso_val.size else 0.0
+        elif isinstance(torso_val, list):
+            torso_val = torso_val[0] if torso_val else 0.0
         obs = TeleopObservation(
             left=state.get('left'),
             right=state.get('right'),
             base=state.get('base_pose'),
-            torso=state.get('torso')[0] if isinstance(state.get('torso'), (list, np.ndarray)) else state.get('torso')
+            torso=torso_val
         )
         
         # Get raw Cartesian action from Oculus

@@ -192,6 +192,29 @@ def main(_):
     @webapp.route("/tiago_step", methods=["POST"])
     def tiago_step():
         action = decode4json(request.json["action"])
+        try:
+            # Avoid huge logs: summarize shapes and a few values
+            def _summarize(payload):
+                if not isinstance(payload, dict):
+                    return f"non-dict payload type={type(payload)}"
+                out = {}
+                for k, v in payload.items():
+                    try:
+                        if isinstance(v, np.ndarray):
+                            flat = v.reshape(-1)
+                            preview = flat[:3].tolist()
+                            out[k] = f"ndarray shape={v.shape} dtype={v.dtype} preview={preview}"
+                        elif isinstance(v, (list, tuple)):
+                            preview = list(v[:3]) if len(v) >= 3 else list(v)
+                            out[k] = f"list len={len(v)} preview={preview}"
+                        else:
+                            out[k] = f"{type(v).__name__} value={v}"
+                    except Exception as exc:  # defensive
+                        out[k] = f"error summarizing: {exc}"
+                return out
+            print("[TiagoServer] <- /tiago_step action summary:", _summarize(action), flush=True)
+        except Exception as exc:  # defensive
+            print(f"[TiagoServer] action summary failed: {exc}", flush=True)
         obs, info = tiago_server.step(action)
         return jsonify({"obs": encode2json(obs), "info": encode2json(info)})
     
