@@ -100,17 +100,12 @@ def restore_inf(arr, dtype=np.float32):
     return arr
 
 def serialize_space_dict(space_dict):
-    """Serialize gym Dict *or* plain mapping of Boxes into JSON-safe dict."""
-    # gym.spaces.Dict exposes .spaces; fall back to treating any mapping as dict
-    if hasattr(space_dict, 'spaces'):
-        items = space_dict.spaces.items()
-    elif isinstance(space_dict, dict):
-        items = space_dict.items()
-    else:
-        raise TypeError(f"Unsupported space_dict type: {type(space_dict)}")
-
+    """
+    @func: serialize a gym.spaces.Dict composed of Box spaces into a JSON-serializable dictionary.t
+        this function handles inf, -inf, and NaN by replacing them with large/safe values.
+    """
     serialized = OrderedDict()
-    for key, box in items:
+    for key, box in space_dict.spaces.items():
         serialized[key] = {
             'type': 'Box',
             'low': sanitize_array(box.low, box.dtype),

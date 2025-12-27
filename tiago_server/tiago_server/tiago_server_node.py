@@ -1,3 +1,4 @@
+import gym
 import os
 import cv2
 import json
@@ -68,36 +69,36 @@ class TiagoEnv:
     @property
     def state_space(self):
         st_space = OrderedDict()
-        st_space['left'] = {'type': 'Box', 'low': [-1e10]*8, 'high': [1e10]*8, 'shape': [8], 'dtype': 'float32'}
-        st_space['right'] = {'type': 'Box', 'low': [-1e10]*8, 'high': [1e10]*8, 'shape': [8], 'dtype': 'float32'}
-        st_space['left_joints'] = {'type': 'Box', 'low': [-1e10]*7, 'high': [1e10]*7, 'shape': [7], 'dtype': 'float32'}
-        st_space['right_joints'] = {'type': 'Box', 'low': [-1e10]*7, 'high': [1e10]*7, 'shape': [7], 'dtype': 'float32'}
-        st_space['base_pose'] = {'type': 'Box', 'low': [-1e10]*3, 'high': [1e10]*3, 'shape': [3], 'dtype': 'float32'}
-        st_space['base_velocity'] = {'type': 'Box', 'low': [-1e10]*3, 'high': [1e10]*3, 'shape': [3], 'dtype': 'float32'}
-        st_space['torso'] = {'type': 'Box', 'low': [-1e10]*1, 'high': [1e10]*1, 'shape': [1], 'dtype': 'float32'}
+        st_space['left'] = gym.spaces.Box(low=-1e10, high=1e10, shape=(8,), dtype=np.float32)
+        st_space['right'] = gym.spaces.Box(low=-1e10, high=1e10, shape=(8,), dtype=np.float32)
+        st_space['left_joints'] = gym.spaces.Box(low=-1e10, high=1e10, shape=(7,), dtype=np.float32)
+        st_space['right_joints'] = gym.spaces.Box(low=-1e10, high=1e10, shape=(7,), dtype=np.float32)
+        st_space['base_pose'] = gym.spaces.Box(low=-1e10, high=1e10, shape=(3,), dtype=np.float32)
+        st_space['base_velocity'] = gym.spaces.Box(low=-1e10, high=1e10, shape=(3,), dtype=np.float32)
+        st_space['torso'] = gym.spaces.Box(low=-1e10, high=1e10, shape=(1,), dtype=np.float32)
         for cam in self.cameras.keys():
-            img_shape = self.cameras[cam].img_shape
-            depth_shape = self.cameras[cam].depth_shape
-            st_space[f'{cam}_image'] = {'type': 'Box', 'low': 0, 'high': 255, 'shape': list(img_shape), 'dtype': 'uint8'}
-            st_space[f'{cam}_depth'] = {'type': 'Box', 'low': 0, 'high': 65535, 'shape': list(depth_shape), 'dtype': 'uint16'}
-        return st_space
+            img_shape = tuple(self.cameras[cam].img_shape)
+            depth_shape = tuple(self.cameras[cam].depth_shape)
+            st_space[f'{cam}_image'] = gym.spaces.Box(low=0, high=255, shape=img_shape, dtype=np.uint8)
+            st_space[f'{cam}_depth'] = gym.spaces.Box(low=0, high=65535, shape=depth_shape, dtype=np.uint16)
+        return gym.spaces.Dict(st_space)
     
     @property
     def observation_space(self):
-        st_space = self.state_space
+        st_space = self.state_space.spaces
         ob_space = OrderedDict()
         for key in self.all_obs_keys:
             ob_space[key] = st_space[key]
-        return ob_space
+        return gym.spaces.Dict(ob_space)
     
     @property
     def action_space(self):
         act_space = OrderedDict()
-        act_space['left'] = {'type': 'Box', 'low': [-1e10]*8, 'high': [1e10]*8, 'shape': [8], 'dtype': 'float32'}
-        act_space['right'] = {'type': 'Box', 'low': [-1e10]*8, 'high': [1e10]*8, 'shape': [8], 'dtype': 'float32'}
-        act_space['base'] = {'type': 'Box', 'low': [-1e10]*3, 'high': [1e10]*3, 'shape': [3], 'dtype': 'float32'}
-        act_space['torso'] = {'type': 'Box', 'low': [-1e10]*1, 'high': [1e10]*1, 'shape': [1], 'dtype': 'float32'}
-        return act_space
+        act_space['left'] = gym.spaces.Box(low=-1e10, high=1e10, shape=(8,), dtype=np.float32)
+        act_space['right'] = gym.spaces.Box(low=-1e10, high=1e10, shape=(8,), dtype=np.float32)
+        act_space['base'] = gym.spaces.Box(low=-1e10, high=1e10, shape=(3,), dtype=np.float32)
+        act_space['torso'] = gym.spaces.Box(low=-1e10, high=1e10, shape=(1,), dtype=np.float32)
+        return gym.spaces.Dict(act_space)
 
     def _state(self):
         def _get_arm_joints(side):
