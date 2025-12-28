@@ -99,12 +99,12 @@ class TiagoClient:
         :return: (observation, info)
         """
         action_json = encode2json(action)
-        print("[TiagoClient] -> /tiago_step action summary:", self._summarize_payload(action))
+        # print("[TiagoClient] -> /tiago_step action summary:", self._summarize_payload(action))
         recept_json = requests.post(
             self.url + "tiago_step", 
             json={'action': action_json}
         ).json()
-        print("[TiagoClient] <- /tiago_step response keys:", list(recept_json.keys()))
+        # print("[TiagoClient] <- /tiago_step response keys:", list(recept_json.keys()))
         
         obs = decode4json(recept_json['obs'])
         info = decode4json(recept_json['info'])
@@ -187,7 +187,9 @@ class TiagoClient:
                 joints_curr = state.get(f'{side}_joints')
                 if joints_curr is not None:
                     joint_goal = self.ik_solvers[side].find_ik(target_pos, target_quat, joints_curr)
-                    
+                    '''
+                    Next time may comment out the safety filter for testing
+                    '''
                     if joint_goal is not None:
                         # 3. Safety Filter
                         if obstacles is not None:
@@ -199,6 +201,7 @@ class TiagoClient:
                         safe_action[side] = np.concatenate([joint_safe, [gripper_val]])
                     else:
                         # If IK fails, stay at current joints
+                        print(f"[TiagoClient] IK failed for {side} arm. Using current joints.")
                         safe_action[side] = np.concatenate([joints_curr, [gripper_val]])
         
         # Process base and torso (direct pass-through for now)
