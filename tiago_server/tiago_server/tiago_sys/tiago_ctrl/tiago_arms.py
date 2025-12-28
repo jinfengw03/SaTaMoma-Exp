@@ -28,7 +28,8 @@ class TiagoArms:
     
     @property
     def arm_pose(self):
-        pos, quat = self.arm_reader.get_transform(target_link=f'/arm_{self.side}_tool_link')
+        # Always express EE pose in torso frame so client-side IK uses consistent frame
+        pos, quat = self.arm_reader.get_transform(target_link=f'/arm_{self.side}_tool_link', base_link='/torso_lift_link')
         if pos is None:
             return None
         return np.concatenate((pos, quat))
@@ -59,15 +60,14 @@ class TiagoArms:
     def create_joint_command(self, joint_goal, duration_scale):
         message = JointTrajectory()
         message.header = Header()
-        joint_names = []
-        positions = list(self.joint_reader.get_most_recent_msg())
-        for i in range(1, 8):
-            joint_names.append(f'arm_{self.side}_{i}_joint')
-            positions[i-1] = joint_goal[i-1]  
+        message.header.stamp = rospy.Time.now()
+        joint_names = [f'arm_{self.side}_{i}_joint' for i in range(1, 8)]
+        positions = list(joint_goal)
+        velocities = [0.0]*7
         message.joint_names = joint_names
         # duration = 1.3 
         duration = 0.7 + duration_scale
-        point = JointTrajectoryPoint(positions=positions, time_from_start = rospy.Duration(duration))
+        point = JointTrajectoryPoint(positions=positions, velocities=velocities, time_from_start = rospy.Duration(duration))
         message.points.append(point)
         return message 
     
