@@ -6,7 +6,7 @@ from tiago_client.utils.transformations import quat_to_rmat
 class TiagoIK:
     def __init__(self, side='right'):
         self.side = side
-        self.urdf_path = os.path.join('/home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client', f'urdf/tiago_{self.side}_arm.urdf')
+        self.urdf_path = os.path.join('/home/jiachenli/SaTaMoma-Exp/tiago_client/tiago_client', f'urdf/tiago.urdf')
         
         # Initialize IK Solver
         self.ik_solver = TracIKSolver(
