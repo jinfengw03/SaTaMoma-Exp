@@ -1,11 +1,17 @@
 import time
 import numpy as np
+import cv2
 from tiago_client.tiago_client import TiagoClient
+from intent_prediction.intent_predictor_integrated import IntentPredictorIntegrated
 
 def main():
     # Initialize the real robot client
     # Default URL is http://192.168.0.110:1234/
     client = TiagoClient(server_url="http://192.168.0.110:1234/", use_teleop=True)
+    
+    # Initialize Intent Predictor
+    # Note: Ensure 'ollama' is installed and 'llava:7b' model is pulled
+    predictor = IntentPredictorIntegrated(model_name='llava:7b', analysis_interval=5.0)
     
     print("\n[REAL] Teleoperation started.")
     print("Controls:")
@@ -26,6 +32,22 @@ def main():
                 # 2. Send action to the robot via HTTP POST
                 obs, info = client.step(action)
                 
+                # 3. Update Intent Predictor with latest observation
+                # obs usually contains 'tiago_head_image' if configured in server
+                if 'tiago_head_image' in obs:
+                    # Assuming image is decoded or needs decoding. 
+                    # If it's raw bytes/base64, it might need processing in TiagoClient first.
+                    # Here we assume obs['tiago_head_image'] is a numpy array (H,W,3)
+                    img = obs['tiago_head_image']
+                    
+                    # Get joint positions for context
+                    joints = obs.get('right_joints', [])
+                    base_vel = obs.get('base_velocity', [0, 0, 0])
+                    torso = obs.get('torso', [0])[0] if isinstance(obs.get('torso'), (list, np.ndarray)) else obs.get('torso', 0)
+                    
+                    # Update predictor state (non-blocking)
+                    predictor.update_state(image=img, joints=joints, base_vel=base_vel, torso=torso)
+                
                 # Optional: Handle specific button presses
                 if buttons.get('B'):
                     print("[REAL] Resetting robot pose...")
@@ -38,6 +60,7 @@ def main():
             
     except KeyboardInterrupt:
         print("\n[REAL] Shutting down...")
+        predictor.stop()
     finally:
         client.close()
 
