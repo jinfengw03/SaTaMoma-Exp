@@ -29,7 +29,7 @@ class TiagoArms:
     @property
     def arm_pose(self):
         # Always express EE pose in torso frame and at the same tip link used by clients/IK
-        pos, quat = self.arm_reader.get_transform(target_link=f'/arm_{self.side}_7_link', base_link='/torso_lift_link')
+        pos, quat = self.arm_reader.get_transform(target_link=f'/arm_{self.side}_tool_link', base_link='/torso_lift_link')
         if pos is None:
             return None
         return np.concatenate((pos, quat))
@@ -50,7 +50,7 @@ class TiagoArms:
     def process_action(self, action):
         # convert deltas to absolute positions
         pos_delta, euler_delta = action[:3], action[3:6]
-        cur_pos, cur_quat = self.arm_reader.get_transform(target_link=f'/arm_{self.side}_7_link', base_link='/torso_lift_link')
+        cur_pos, cur_quat = self.arm_reader.get_transform(target_link=f'/arm_{self.side}_tool_link', base_link='/torso_lift_link')
         cur_euler = quat_to_euler(cur_quat)
         target_pos = cur_pos + pos_delta
         target_euler = add_angles(euler_delta, cur_euler)
