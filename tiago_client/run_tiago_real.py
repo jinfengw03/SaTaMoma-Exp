@@ -32,9 +32,9 @@ def main():
                     # Define a default reset pose if needed
                     # client.reset(default_reset_pose)
             
-            # Maintain control frequency (approx 20Hz)
+            # Maintain higher control frequency (~50-60 Hz) to reduce latency sensitivity
             elapsed = time.time() - start_time
-            time.sleep(max(0, 0.05 - elapsed))
+            time.sleep(max(0, 0.01 - elapsed))
             
     except KeyboardInterrupt:
         print("\n[REAL] Shutting down...")

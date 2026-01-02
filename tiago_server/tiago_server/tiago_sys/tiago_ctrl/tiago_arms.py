@@ -40,7 +40,7 @@ class TiagoArms:
             self.ik_solver = TracIKSolver(
                 urdf_file=self.urdf_path,
                 base_link="torso_lift_link",
-                tip_link=f"arm_{self.side}_7_link",
+                tip_link=f"arm_{self.side}_tool_link",
                 timeout=0.025,
                 epsilon=5e-4,
                 solve_type="Distance"
@@ -50,7 +50,7 @@ class TiagoArms:
     def process_action(self, action):
         # convert deltas to absolute positions
         pos_delta, euler_delta = action[:3], action[3:6]
-        cur_pos, cur_quat = self.arm_reader.get_transform(target_link=f'/arm_{self.side}_tool_link', base_link='/torso_lift_link')
+        cur_pos, cur_quat = self.arm_reader.get_transform(target_link=f'/arm_{self.side}_7_link', base_link='/torso_lift_link')
         cur_euler = quat_to_euler(cur_quat)
         target_pos = cur_pos + pos_delta
         target_euler = add_angles(euler_delta, cur_euler)

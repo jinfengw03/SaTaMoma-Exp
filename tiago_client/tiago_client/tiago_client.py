@@ -21,6 +21,7 @@ class TiagoClient:
             self.url += "/"
             
         print(f"[TiagoClient] Connecting to {self.url}...")
+        self.session = requests.Session()  # reuse HTTP connections to cut latency
         
         # Fetch robot specifications from the server
         self.action_space = self._obtain_action_space()
@@ -72,15 +73,15 @@ class TiagoClient:
         return summary
 
     def _obtain_state_space(self):
-        data = requests.post(self.url + "tiago_get_state_space").json()
+        data = self.session.post(self.url + "tiago_get_state_space").json()
         return reconstruct_space_dict(data)
     
     def _obtain_observation_space(self):
-        data = requests.post(self.url + "tiago_get_observation_space").json()
+        data = self.session.post(self.url + "tiago_get_observation_space").json()
         return reconstruct_space_dict(data)
     
     def _obtain_action_space(self):
-        data = requests.post(self.url + "tiago_get_action_space").json()
+        data = self.session.post(self.url + "tiago_get_action_space").json()
         return reconstruct_space_dict(data)
 
     def reset(self, reset_pose):
@@ -89,7 +90,7 @@ class TiagoClient:
         :param reset_pose: Dictionary containing target positions for arms, base, torso, etc.
         """
         reset_pose_json = encode2json(reset_pose)
-        recept_json = requests.post(self.url + "tiago_reset", json={'reset_pose': reset_pose_json}).json()
+        recept_json = self.session.post(self.url + "tiago_reset", json={'reset_pose': reset_pose_json}).json()
         return decode4json(recept_json)
 
     def step(self, action):
@@ -100,7 +101,7 @@ class TiagoClient:
         """
         action_json = encode2json(action)
         # print("[TiagoClient] -> /tiago_step action summary:", self._summarize_payload(action))
-        recept_json = requests.post(
+        recept_json = self.session.post(
             self.url + "tiago_step", 
             json={'action': action_json}
         ).json()
@@ -112,12 +113,12 @@ class TiagoClient:
 
     def get_state(self):
         """Retrieves the full state of the robot including visual data."""
-        data = requests.post(self.url + "tiago_get_state").json()
+        data = self.session.post(self.url + "tiago_get_state").json()
         return decode4json(data)
     
     def get_state_wo_vis(self):
         """Retrieves the robot state without heavy visual data (joints, poses only)."""
-        data = requests.post(self.url + "tiago_get_state_wo_vis").json()
+        data = self.session.post(self.url + "tiago_get_state_wo_vis").json()
         return decode4json(data)
 
     def get_oculus_state(self):
@@ -131,7 +132,7 @@ class TiagoClient:
     def close(self):
         """Sends a signal to shut down the onboard server connection."""
         try:
-            return requests.post(self.url + "tiago_close")
+            return self.session.post(self.url + "tiago_close")
         except Exception:
             return None
 
@@ -191,14 +192,15 @@ class TiagoClient:
                     Next time may comment out the safety filter for testing
                     '''
                     if joint_goal is not None:
-                        # 3. Safety Filter
-                        if obstacles is not None:
-                            self.safety_filters[side].update_obstacles(obstacles)
+                        # # 3. Safety Filter
+                        # if obstacles is not None:
+                        #     self.safety_filters[side].update_obstacles(obstacles)
                         
-                        joint_safe = self.safety_filters[side].filter(joints_curr, joint_goal)
+                        # joint_safe = self.safety_filters[side].filter(joints_curr, joint_goal)
                         
-                        # 4. Combine with gripper (8 elements total)
-                        safe_action[side] = np.concatenate([joint_safe, [gripper_val]])
+                        # # 4. Combine with gripper (8 elements total)
+                        # safe_action[side] = np.concatenate([joint_safe, [gripper_val]])
+                        safe_action[side] = np.concatenate([joint_goal, [gripper_val]])
                     else:
                         # If IK fails, stay at current joints
                         print(f"[TiagoClient] IK failed for {side} arm. Using current joints.")
