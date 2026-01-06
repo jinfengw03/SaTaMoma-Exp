@@ -30,9 +30,18 @@ class TiagoClient:
         # Initialize Teleop, IK, and Safety
         self.teleop = None
         if use_teleop:
-            from tiago_client.oculus_teleop.configs.only_vr import teleop_config
-            self.teleop = TeleopPolicy(teleop_config)
-            self.teleop.start()
+            # Check if we want VR or Keyboard (Hybrid)
+            # You can control this via an env var or argument, for now defaulting to VR if not specified
+            teleop_type = os.environ.get("TIAGO_TELEOP_TYPE", "VR") # VR or KEYBOARD
+            
+            if teleop_type == "KEYBOARD":
+                from tiago_client.oculus_teleop.hybrid_teleop_policy import HybridTeleopPolicy
+                self.teleop = HybridTeleopPolicy()
+                self.teleop.start()
+            else:
+                from tiago_client.oculus_teleop.configs.only_vr import teleop_config
+                self.teleop = TeleopPolicy(teleop_config)
+                self.teleop.start()
             
             # Initialize IK and Safety for both arms
             self.ik_solvers = {
