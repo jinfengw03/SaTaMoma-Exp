@@ -80,7 +80,7 @@ class TiagoClientSim:
         for side in ['right', 'left']:
             try:
                 # Pose of EE relative to torso_lift_link (matching TiagoClient behavior)
-                target_frame = f'arm_{side}_7_link'
+                target_frame = f'arm_{side}_tool_link'
                 source_frame = 'torso_lift_link'
                 (trans, quat) = self.tf_listener.lookupTransform(source_frame, target_frame, rospy.Time(0))
                 state[side] = np.array(list(trans) + list(quat))

@@ -1,4 +1,5 @@
 # activate conda environment
+source /home/pal/miniconda3/bin/activate
 conda activate tiago
 
 # export env vars

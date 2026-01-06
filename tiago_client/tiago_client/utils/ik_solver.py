@@ -12,7 +12,7 @@ class TiagoIK:
         self.ik_solver = TracIKSolver(
             urdf_file=self.urdf_path,
             base_link="torso_lift_link",
-            tip_link=f"arm_{self.side}_7_link",
+            tip_link=f"arm_{self.side}_tool_link",
             timeout=0.025,
             epsilon=5e-4,
             solve_type="Distance"

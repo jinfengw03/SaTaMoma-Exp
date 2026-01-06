@@ -154,12 +154,6 @@ class IntentPredictorIntegrated:
         if torso_desc != "unknown":
             prompt_parts.append(f"Robot Torso Status: {torso_desc}")
         
-        prompt_parts.extend([
-            "Please provide:",np.abs(end_state['positions'] - start_state['positions']))
-            if max_diff > 0.02:
-                motion_desc = "MOVING"
-            else:
-                motion_desc = "STATIONARY"
         
         prompt_parts.append(f"Robot Arm Status: {motion_desc}")
         

@@ -43,10 +43,15 @@ def main():
                     # Get joint positions for context
                     joints = obs.get('right_joints', [])
                     base_vel = obs.get('base_velocity', [0, 0, 0])
-                    torso = obs.get('torso', [0])[0] if isinstance(obs.get('torso'), (list, np.ndarray)) else obs.get('torso', 0)
-                    
+                   
+                    torso_val = obs.get('torso', 0)
+                    if isinstance(torso_val, np.ndarray):
+                        torso_val = float(torso_val.reshape(-1)[0]) if torso_val.size else 0.0
+                    elif isinstance(torso_val, list):
+                        torso_val = torso_val[0] if torso_val else 0.0
+
                     # Update predictor state (non-blocking)
-                    predictor.update_state(image=img, joints=joints, base_vel=base_vel, torso=torso)
+                    predictor.update_state(image=img, joints=joints, base_vel=base_vel, torso=torso_val)
                 
                 # Optional: Handle specific button presses
                 if buttons.get('B'):

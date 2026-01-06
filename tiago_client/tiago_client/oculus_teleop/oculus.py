@@ -48,7 +48,7 @@ class OculusPolicy(BaseTeleopInterface):
         port = int(port_cfg if port_cfg is not None else (port_env if port_env is not None else 5555))
 
         # If ip_address is None, OculusReader will behave like reader.py (USB)
-        self.oculus_reader = OculusReader(run=False, ip_address=ip_address, port=port)
+        self.oculus_reader = OculusReader(run=False, ip_address="192.168.0.140")
         
         self.vr_to_global_mat = {'right': np.eye(4), 'left': np.eye(4)}
         self.max_lin_vel = max_lin_vel
@@ -236,8 +236,12 @@ class OculusPolicy(BaseTeleopInterface):
             eef_data = obs[arm]
             if eef_data is None:
                 continue
-            # Use full 7-element pose (x,y,z,qx,qy,qz,qw); gripper from VR buttons, not this pose.
-            robot_obs = {'cartesian_position': eef_data[:7], 'gripper_position': 0.0}
+            # Pass current gripper position (index 7 if present) so toggle logic can switch open/close properly.
+            gripper_pos = float(eef_data[7]) if (len(eef_data) >= 8) else 0.0
+            robot_obs = {
+                'cartesian_position': eef_data[:7],
+                'gripper_position': gripper_pos,
+            }
             if self._state[arm]["poses"] is not None:
                 action[arm] = self._calculate_action(robot_obs, arm, is_filter)
 
