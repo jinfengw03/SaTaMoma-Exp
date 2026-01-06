@@ -14,17 +14,21 @@ class HybridTeleopPolicy:
     """
     def __init__(self):
         # State
-        self.mode = 'JOINT' # 'JOINT' or 'CARTESIAN'
+        # Default to Cartesian to match TiagoClient's IK pipeline
+        self.mode = 'CARTESIAN' # 'JOINT' or 'CARTESIAN'
         self.lock = Lock()
         
         # Control parameters
         self.cartesian_step = 0.02
+        self.orientation_step = 0.05
         self.joint_step = 0.05
         
         # Current accumulated actions
-        self.base_cmd = [0.0, 0.0]  # linear.x, angular.z
+        # Base uses 3D twist matching TeleopAction: [vx, vy, wz]
+        self.base_cmd = [0.0, 0.0, 0.0]
         self.torso_cmd = 0.0        # absolute position, needs sync with obs
         self.gripper_cmd = 0.0      # 0.0 (closed) to 1.0 (open)
+        self._last_gripper_cmd = 0.0
         
         # For cartesian/joint delta accumulation
         self.cartesian_delta = np.zeros(6) # x, y, z, roll, pitch, yaw
@@ -47,31 +51,17 @@ class HybridTeleopPolicy:
         self._print_usage()
 
     def _print_usage(self):
-        print("\n" + "="*50)
-        print("TIAGo Hybrid Teleop Policy (Keyboard)")
-        print("="*50)
-        print(f"Current Mode: [{self.mode}] (Press TAB to switch)")
-        print("-" * 30)
-        print("Common Controls:")
-        print("  Base:    WASD (Move) / QE (Rotate) / Space (Stop)")
-        print("  Torso:   M (Up) / N (Down)")
-        print("  Gripper: P (Open) / ; (Close)")
-        print("-" * 30)
+        # Short, multi-line block to reduce wrap/indent artifacts when mixed with other logs
         if self.mode == 'CARTESIAN':
-            print("Cartesian Mode (End-Effector Delta):")
-            print("  I / K :  X +/- (Forward/Backward)")
-            print("  J / L :  Y +/- (Left/Right)")
-            print("  U / O :  Z +/- (Up/Down)")
+            arm_help = "Arm: I/K X, J/L Y, U/O Z, R/F Roll, T/G Pitch, Y/H Yaw"
         else:
-            print("Joint Mode (Right Arm Delta):")
-            print("  R / F :  J1 +/-")
-            print("  T / G :  J2 +/-")
-            print("  Y / H :  J3 +/-")
-            print("  U / J :  J4 +/-")
-            print("  I / K :  J5 +/-")
-            print("  O / L :  J6 +/-")
-            print("  Z / X :  J7 +/-")
-        print("="*50)
+            arm_help = "Arm: JOINT unsupported"
+        lines = [
+            f"[KB Teleop] Mode: {self.mode} (TAB to toggle)",
+            "Base: WASD move, QE rotate, Space stop | Torso: M up / N down | Gripper: P open / ; close",
+            arm_help,
+        ]
+        print("\n".join(lines), flush=True)
 
     def _get_key(self):
         try:
@@ -97,14 +87,14 @@ class HybridTeleopPolicy:
                         self._print_usage()
                         continue
 
-                    # Base
-                    if key == 'w': self.base_cmd = [0.5, 0.0]
-                    elif key == 's': self.base_cmd = [-0.5, 0.0]
-                    elif key == 'a': self.base_cmd = [0.0, 1.0]
-                    elif key == 'd': self.base_cmd = [0.0, -1.0]
-                    elif key == 'q': self.base_cmd = [0.0, 1.5]
-                    elif key == 'e': self.base_cmd = [0.0, -1.5]
-                    elif key == ' ': self.base_cmd = [0.0, 0.0]
+                    # Base (vx, vy, wz) — match VR interface shape to avoid server errors
+                    if key == 'w': self.base_cmd = [0.5, 0.0, 0.0]
+                    elif key == 's': self.base_cmd = [-0.5, 0.0, 0.0]
+                    elif key == 'a': self.base_cmd = [0.0, 0.3, 0.0]
+                    elif key == 'd': self.base_cmd = [0.0, -0.3, 0.0]
+                    elif key == 'q': self.base_cmd = [0.0, 0.0, 1.5]
+                    elif key == 'e': self.base_cmd = [0.0, 0.0, -1.5]
+                    elif key == ' ': self.base_cmd = [0.0, 0.0, 0.0]
 
                     # Torso (delta accumulation request)
                     if key == 'm': self.torso_cmd += 0.02
@@ -122,6 +112,12 @@ class HybridTeleopPolicy:
                         elif key == 'l': self.cartesian_delta[1] -= self.cartesian_step
                         elif key == 'u': self.cartesian_delta[2] += self.cartesian_step
                         elif key == 'o': self.cartesian_delta[2] -= self.cartesian_step
+                        elif key == 'r': self.cartesian_delta[3] += self.orientation_step
+                        elif key == 'f': self.cartesian_delta[3] -= self.orientation_step
+                        elif key == 't': self.cartesian_delta[4] += self.orientation_step
+                        elif key == 'g': self.cartesian_delta[4] -= self.orientation_step
+                        elif key == 'y': self.cartesian_delta[5] += self.orientation_step
+                        elif key == 'h': self.cartesian_delta[5] -= self.orientation_step
                     elif self.mode == 'JOINT':
                         if key == 'r': self.joint_delta[0] += self.joint_step
                         elif key == 'f': self.joint_delta[0] -= self.joint_step
@@ -148,8 +144,8 @@ class HybridTeleopPolicy:
         """
         # Initialize torso from observation once
         if not self.torso_initialized and obs.torso is not None:
-             self.torso_cmd = obs.torso
-             self.torso_initialized = True
+            self.torso_cmd = obs.torso
+            self.torso_initialized = True
 
         action = {}
         extra = {'buttons': {}} # Placeholder
@@ -157,6 +153,8 @@ class HybridTeleopPolicy:
         with self.lock:
             # Base
             action['base'] = np.array(self.base_cmd)
+            # Reset base after each read so keypress is a pulse, not a latch
+            self.base_cmd = [0.0, 0.0, 0.0]
             
             # Torso
             # Clip accumulated torso command
@@ -181,11 +179,19 @@ class HybridTeleopPolicy:
             if self.mode == 'CARTESIAN':
                 # [dx, dy, dz, droll, dpitch, dyaw]
                 pose_delta = self.cartesian_delta.copy()
+                # Deadband small noise to prevent drift when idle
+                if np.all(np.abs(pose_delta) < 1e-6):
+                    pose_delta[:] = 0
                 # Reset delta after reading (impulse control)
                 self.cartesian_delta[:] = 0 
-                
-                cmd_vec = np.concatenate([pose_delta, [self.gripper_cmd]])
-                action['right'] = cmd_vec
+                send_arm = not np.allclose(pose_delta, 0)
+                send_arm = send_arm or (self.gripper_cmd != self._last_gripper_cmd)
+                if send_arm:
+                    cmd_vec = np.concatenate([pose_delta, [self.gripper_cmd]])
+                    action['right'] = cmd_vec
+                    self._last_gripper_cmd = self.gripper_cmd
+                else:
+                    action['right'] = None
             else:
                 # Fallback or Todo: Handle JOINT mode in TiagoClient
                 # Current TiagoClient logic:
@@ -193,7 +199,9 @@ class HybridTeleopPolicy:
                 # So we can't easily pass joint angles without modifying client.
                 # We will just print warning for now.
                 print("Warning: JOINT mode not fully supported by standard TiagoClient teleop logic yet.")
-                action['right'] = np.array([0,0,0,0,0,0, self.gripper_cmd])
+                action['right'] = None
+                # Clear joint delta so it never latches
+                self.joint_delta[:] = 0
 
             # Left Arm (No control in this keyboard map)
             action['left'] = None
