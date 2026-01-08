@@ -29,8 +29,12 @@ class TiagoEnv:
                  frequency=10,
                  reset_pose={
                      'left': [0.43, -0.81, 1.60, 1.78, 1.34, -0.49, 1.15, 1],
-                     'right': [0.43, -0.81, 1.60, 1.78, 1.34, -0.49, 1.15, 1]
-                 }):
+                     'right': [0.43, -0.81, 1.60, 1.78, 1.34, -0.49, 1.15, 1],
+                     'torso': 0.29,
+                     'head': [0.0, -0.90],
+                     },
+                 all_act_keys={'left', 'right', 'base', 'torso', 'head'},
+                 ):
         
         self.frequency = frequency
         self.start_time = None
@@ -51,6 +55,7 @@ class TiagoEnv:
         # Observation keys the server will expose; defaults to all state keys.
         # This prevents AttributeError when a new observation key is added but
         # the list was not initialized.
+        self.all_act_keys = all_act_keys
         self.all_obs_keys = list(self.state_space.spaces.keys())
         
         # Obstacle subscriber
