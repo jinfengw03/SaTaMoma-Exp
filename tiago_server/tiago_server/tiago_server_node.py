@@ -57,7 +57,8 @@ class TiagoEnv:
         # the list was not initialized.
         self.all_act_keys = all_act_keys
         self.all_obs_keys = list(self.state_space.spaces.keys())
-        
+        # Reset TIAGo for execution
+        self.obs = self.reset(reset_arms=True, is_input_cont=False)
         # Obstacle subscriber
         self.detected_spheres = []
         self.sphere_sub = rospy.Subscriber('/detected_spheres', Float64MultiArray, self.sphere_callback)
