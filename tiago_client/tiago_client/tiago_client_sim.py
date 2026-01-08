@@ -26,6 +26,7 @@ class TiagoClientSim:
         self.arm_right_names = [f'arm_right_{i}_joint' for i in range(1, 8)]
         self.arm_left_names = [f'arm_left_{i}_joint' for i in range(1, 8)]
         self.torso_names = ['torso_lift_joint']
+        self.head_names = ['head_1_joint', 'head_2_joint']
         self.gripper_right_names = ['gripper_right_left_finger_joint', 'gripper_right_right_finger_joint']
         self.gripper_left_names = ['gripper_left_left_finger_joint', 'gripper_left_right_finger_joint']
         
@@ -37,6 +38,7 @@ class TiagoClientSim:
         self.arm_right_pub = rospy.Publisher('/arm_right_controller/command', JointTrajectory, queue_size=10)
         self.arm_left_pub = rospy.Publisher('/arm_left_controller/command', JointTrajectory, queue_size=10)
         self.torso_pub = rospy.Publisher('/torso_controller/command', JointTrajectory, queue_size=10)
+        self.head_pub = rospy.Publisher('/head_controller/command', JointTrajectory, queue_size=10)
         self.gripper_right_pub = rospy.Publisher('/parallel_gripper_right_controller/command', JointTrajectory, queue_size=10)
         self.gripper_left_pub = rospy.Publisher('/parallel_gripper_left_controller/command', JointTrajectory, queue_size=10)
         self.base_pub = rospy.Publisher('/mobile_base_controller/cmd_vel', Twist, queue_size=10)
@@ -75,6 +77,7 @@ class TiagoClientSim:
         state['right_joints'] = np.array([self.current_joints.get(n, 0.0) for n in self.arm_right_names])
         state['left_joints'] = np.array([self.current_joints.get(n, 0.0) for n in self.arm_left_names])
         state['torso'] = np.array([self.current_joints.get(n, 0.0) for n in self.torso_names])
+        state['head'] = np.array([self.current_joints.get(n, 0.0) for n in self.head_names])
         
         # Get Cartesian poses via TF
         for side in ['right', 'left']:
@@ -139,6 +142,16 @@ class TiagoClientSim:
             traj.points.append(point)
             self.torso_pub.publish(traj)
 
+        # 2b. Head
+        if 'head' in action:
+            traj = JointTrajectory()
+            traj.joint_names = self.head_names
+            point = JointTrajectoryPoint()
+            point.positions = [action['head']] if np.isscalar(action['head']) else action['head']
+            point.time_from_start = rospy.Duration(dt)
+            traj.points.append(point)
+            self.head_pub.publish(traj)
+
         # 3. Base
         if 'base' in action:
             vel = Twist()
@@ -161,7 +174,8 @@ class TiagoClientSim:
             left=state.get('left'),
             right=state.get('right'),
             base=state.get('base_pose'),
-            torso=state.get('torso')[0] if isinstance(state.get('torso'), (list, np.ndarray)) else state.get('torso')
+            torso=state.get('torso')[0] if isinstance(state.get('torso'), (list, np.ndarray)) else state.get('torso'),
+            head=state.get('head')
         )
         
         raw_action = self.teleop.get_action(obs, is_filter=is_filter)
@@ -200,5 +214,7 @@ class TiagoClientSim:
             safe_action['base'] = raw_action['base']
         if 'torso' in raw_action:
             safe_action['torso'] = raw_action['torso']
+        if 'head' in raw_action and raw_action['head'] is not None:
+            safe_action['head'] = raw_action['head']
             
         return safe_action, buttons

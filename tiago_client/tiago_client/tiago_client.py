@@ -163,11 +163,19 @@ class TiagoClient:
             torso_val = float(torso_val.reshape(-1)[0]) if torso_val.size else 0.0
         elif isinstance(torso_val, list):
             torso_val = torso_val[0] if torso_val else 0.0
+        head_val = state.get('head')
+        if isinstance(head_val, np.ndarray):
+            head_val = head_val.reshape(-1)[:2]
+        elif isinstance(head_val, (list, tuple)):
+            head_val = np.array(list(head_val)).reshape(-1)[:2]
+        else:
+            head_val = None
         obs = TeleopObservation(
             left=state.get('left'),
             right=state.get('right'),
             base=state.get('base_pose'),
-            torso=torso_val
+            torso=torso_val,
+            head=head_val
         )
         
         # Get raw Cartesian action from Oculus
@@ -218,5 +226,7 @@ class TiagoClient:
             safe_action['base'] = raw_action['base']
         if 'torso' in raw_action:
             safe_action['torso'] = raw_action['torso']
+        if 'head' in raw_action and raw_action['head'] is not None:
+            safe_action['head'] = raw_action['head']
             
         return safe_action, buttons

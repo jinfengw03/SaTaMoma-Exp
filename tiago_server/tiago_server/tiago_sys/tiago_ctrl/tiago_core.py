@@ -86,7 +86,15 @@ class Tiago:
                     self.gripper[side].step(gripper_action) # abs 
         # head 
         if self.head_enabled:
-            self.head.step(action) # TBD: ...
+            head_action = None
+            try:
+                head_action = action.get('head')
+            except Exception:
+                head_action = None
+            if head_action is not None:
+                self.head.write(head_action)
+            else:
+                self.head.step(action)
         # base 
         if self.base_enabled:
             if action.get('base') is not None:

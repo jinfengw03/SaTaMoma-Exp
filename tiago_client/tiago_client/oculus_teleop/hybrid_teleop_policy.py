@@ -22,6 +22,7 @@ class HybridTeleopPolicy:
         self.cartesian_step = 0.02
         self.orientation_step = 0.05
         self.joint_step = 0.05
+        self.head_step = 0.1
         
         # Current accumulated actions
         # Base uses 3D twist matching TeleopAction: [vx, vy, wz]
@@ -29,6 +30,7 @@ class HybridTeleopPolicy:
         self.torso_cmd = 0.0        # absolute position, needs sync with obs
         self.gripper_cmd = 0.0      # 0.0 (closed) to 1.0 (open)
         self._last_gripper_cmd = 0.0
+        self.head_cmd = np.zeros(2)
         
         # For cartesian/joint delta accumulation
         self.cartesian_delta = np.zeros(6) # x, y, z, roll, pitch, yaw
@@ -36,6 +38,10 @@ class HybridTeleopPolicy:
         
         # Initial state flags
         self.torso_initialized = False
+        self.head_initialized = False
+
+        # Head joint limits (rad): [head_1_joint, head_2_joint]
+        self.head_limits = [(-1.3, 1.3), (-1.05, 0.785)]
 
         # Keyboard reading setup
         self.settings = termios.tcgetattr(sys.stdin)
@@ -58,7 +64,7 @@ class HybridTeleopPolicy:
             arm_help = "Arm: JOINT unsupported"
         lines = [
             f"[KB Teleop] Mode: {self.mode} (TAB to toggle)",
-            "Base: WASD move, QE rotate, Space stop | Torso: M up / N down | Gripper: P open / ; close",
+            "Base: WASD move, QE rotate, Space stop | Torso: M up / N down | Head: Arrow keys | Gripper: P open / ; close",
             arm_help,
         ]
         print("\n".join(lines), flush=True)
@@ -67,8 +73,8 @@ class HybridTeleopPolicy:
         try:
             tty.setraw(sys.stdin.fileno())
             key = sys.stdin.read(1)
-            # Handle escape sequences if needed (arrow keys etc)
-            # For simplicity, we stick to char keys
+            if key == '\x1b':
+                key += sys.stdin.read(2) # arrow keys
             return key
         finally:
             termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.settings)
@@ -103,6 +109,16 @@ class HybridTeleopPolicy:
                     # Gripper
                     if key == 'p': self.gripper_cmd = 1.0
                     elif key == ';': self.gripper_cmd = 0.0
+
+                    # Head (absolute position commands)
+                    if key == '\x1b[A': # Up
+                        self.head_cmd[1] = max(self.head_limits[1][0], self.head_cmd[1] - self.head_step)
+                    elif key == '\x1b[B': # Down
+                        self.head_cmd[1] = min(self.head_limits[1][1], self.head_cmd[1] + self.head_step)
+                    elif key == '\x1b[C': # Right
+                        self.head_cmd[0] = max(self.head_limits[0][0], self.head_cmd[0] - self.head_step)
+                    elif key == '\x1b[D': # Left
+                        self.head_cmd[0] = min(self.head_limits[0][1], self.head_cmd[0] + self.head_step)
 
                     # Arm Control
                     if self.mode == 'CARTESIAN':
@@ -146,6 +162,11 @@ class HybridTeleopPolicy:
         if not self.torso_initialized and obs.torso is not None:
             self.torso_cmd = obs.torso
             self.torso_initialized = True
+
+        # Initialize head from observation once
+        if not self.head_initialized and getattr(obs, 'head', None) is not None:
+            self.head_cmd = np.array(obs.head).reshape(-1)[:2]
+            self.head_initialized = True
 
         action = {}
         extra = {'buttons': {}} # Placeholder
@@ -205,6 +226,14 @@ class HybridTeleopPolicy:
 
             # Left Arm (No control in this keyboard map)
             action['left'] = None
+
+            # Head (absolute positions for head_1_joint, head_2_joint)
+            if self.head_initialized:
+                self.head_cmd[0] = np.clip(self.head_cmd[0], *self.head_limits[0])
+                self.head_cmd[1] = np.clip(self.head_cmd[1], *self.head_limits[1])
+                action['head'] = self.head_cmd.copy()
+            else:
+                action['head'] = None
 
         # Wrap in an object that allows access via .extra if needed (simulating TeleopAction)
         class ActionWrapper(dict):

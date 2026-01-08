@@ -32,10 +32,11 @@ class TiagoEnv:
                      'torso': 0.29,
                      'head': [0.0, -0.90],
                      },
-                 all_act_keys={'left', 'right', 'base', 'torso'},
+                 all_act_keys={'left', 'right', 'base', 'torso', 'head'},
                  all_obs_keys = OrderedDict.fromkeys([
                      "left", "right", "left_joints", "right_joints",
                      "base_pose", "base_velocity", "torso",
+                     "head",
                      "tiago_head_image",
                      ]),
                  ):
@@ -76,6 +77,9 @@ class TiagoEnv:
         st_space['base_pose'] = gym.spaces.Box(low=-1e10, high=1e10, shape=(3,), dtype=np.float32)
         st_space['base_velocity'] = gym.spaces.Box(low=-1e10, high=1e10, shape=(3,), dtype=np.float32)
         st_space['torso'] = gym.spaces.Box(low=-1e10, high=1e10, shape=(1,), dtype=np.float32)
+        st_space['head'] = gym.spaces.Box(low=np.array([-1.3, -1.05], dtype=np.float32),
+                                          high=np.array([1.3, 0.785], dtype=np.float32),
+                                          shape=(2,), dtype=np.float32)
         for cam in self.cameras.keys():
             img_shape = tuple(self.cameras[cam].img_shape)
             depth_shape = tuple(self.cameras[cam].depth_shape)
@@ -98,6 +102,9 @@ class TiagoEnv:
         act_space['right'] = gym.spaces.Box(low=-1e10, high=1e10, shape=(8,), dtype=np.float32)
         act_space['base'] = gym.spaces.Box(low=-1e10, high=1e10, shape=(3,), dtype=np.float32)
         act_space['torso'] = gym.spaces.Box(low=-1e10, high=1e10, shape=(1,), dtype=np.float32)
+        act_space['head'] = gym.spaces.Box(low=np.array([-1.3, -1.05], dtype=np.float32),
+                           high=np.array([1.3, 0.785], dtype=np.float32),
+                           shape=(2,), dtype=np.float32)
         return gym.spaces.Dict(act_space)
 
     def _state(self):
@@ -105,6 +112,9 @@ class TiagoEnv:
             joints = self.tiago.arms[side].joint_reader.get_most_recent_msg()
             return np.array(joints) if joints is not None else np.zeros(7)
 
+        head_state = self.tiago.head.get_head_extension() if self.tiago.head is not None else None
+        if head_state is None:
+            head_state = np.zeros(2)
         states = AttrDict({
             'left': np.r_[np.array(self.tiago.arms['left'].arm_pose), np.array(self.tiago.left_gripper_pos)],
             'right': np.r_[np.array(self.tiago.arms['right'].arm_pose), np.array(self.tiago.right_gripper_pos)],
@@ -113,6 +123,7 @@ class TiagoEnv:
             'base_pose': np.array(self.tiago.base.get_delta_pose()),
             'base_velocity': np.array(self.tiago.base.get_velocity()),
             'torso': np.array(self.tiago.torso.get_torso_extension()),
+            'head': np.array(head_state),
         })
         for cam in self.cameras.keys():
             states[f'{cam}_image'] = np.array(self.cameras[cam].get_img())
@@ -124,6 +135,9 @@ class TiagoEnv:
             joints = self.tiago.arms[side].joint_reader.get_most_recent_msg()
             return np.array(joints) if joints is not None else np.zeros(7)
 
+        head_state = self.tiago.head.get_head_extension() if self.tiago.head is not None else None
+        if head_state is None:
+            head_state = np.zeros(2)
         states = AttrDict({
             'left': np.r_[np.array(self.tiago.arms['left'].arm_pose), np.array(self.tiago.left_gripper_pos)],
             'right': np.r_[np.array(self.tiago.arms['right'].arm_pose), np.array(self.tiago.right_gripper_pos)],
@@ -132,6 +146,7 @@ class TiagoEnv:
             'base_pose': np.array(self.tiago.base.get_delta_pose()),
             'base_velocity': np.array(self.tiago.base.get_velocity()),
             'torso': np.array(self.tiago.torso.get_torso_extension()),
+            'head': np.array(head_state),
         })
         return states
 
