@@ -157,6 +157,10 @@ class TiagoClient:
         # Get current robot state
         state = self.get_state_wo_vis()
         
+        # Use obstacles from server state if not provided explicitly
+        if obstacles is None:
+            obstacles = state.get('obstacles')
+        
         # Prepare observation for teleop policy
         torso_val = state.get('torso')
         if isinstance(torso_val, np.ndarray):

@@ -8,6 +8,7 @@ import rospy
 import pickle
 import base64
 import numpy as np
+from std_msgs.msg import Float64MultiArray
 from absl import app, flags
 from datetime import datetime
 from collections import OrderedDict
@@ -28,10 +29,25 @@ class TiagoEnv:
                  frequency=10,
                  reset_pose={
                      'left': [0.43, -0.81, 1.60, 1.78, 1.34, -0.49, 1.15, 1],
-                     'right': [0.43, -0.81, 1.60, 1.78, 1.34, -0.49, 1.15, 1],
-                     'torso': 0.29,
-                     'head': [0.0, -0.90],
-                     },
+                     'right': [0.43, -0.81, 1.60, 1.78, 1.34, -0.49, 1.15, 1]
+                 }):
+        
+        self.tiago = Tiago(frequency=frequency)
+        self.cameras = OrderedDict()
+        
+        # Obstacle subscriber
+        self.detected_spheres = []
+        self.sphere_sub = rospy.Subscriber('/detected_spheres', Float64MultiArray, self.sphere_callback)
+
+    def sphere_callback(self, msg):
+        # Format: [x1, y1, z1, r1, x2, y2, z2, r2, ...]
+        if msg.data:
+            data = list(msg.data)
+            self.detected_spheres = [data[i:i+4] for i in range(0, len(data), 4)]
+        else:
+            self.detected_spheres = []
+
+    def _obtain_action_space(self):
                  all_act_keys={'left', 'right', 'base', 'torso'},
                  all_obs_keys = OrderedDict.fromkeys([
                      "left", "right", "left_joints", "right_joints",
@@ -132,6 +148,7 @@ class TiagoEnv:
             'base_pose': np.array(self.tiago.base.get_delta_pose()),
             'base_velocity': np.array(self.tiago.base.get_velocity()),
             'torso': np.array(self.tiago.torso.get_torso_extension()),
+            'obstacles': np.array(self.detected_spheres),
         })
         return states
 
