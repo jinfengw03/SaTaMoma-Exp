@@ -34,6 +34,11 @@ class TiagoEnv:
         
         self.tiago = Tiago(frequency=frequency)
         self.cameras = OrderedDict()
+
+        # Observation keys the server will expose; defaults to all state keys.
+        # This prevents AttributeError when a new observation key is added but
+        # the list was not initialized.
+        self.all_obs_keys = list(self.state_space.spaces.keys())
         
         # Obstacle subscriber
         self.detected_spheres = []
@@ -47,41 +52,7 @@ class TiagoEnv:
         else:
             self.detected_spheres = []
 
-    def _obtain_action_space(self):
-                 all_act_keys={'left', 'right', 'base', 'torso'},
-                 all_obs_keys = OrderedDict.fromkeys([
-                     "left", "right", "left_joints", "right_joints",
-                     "base_pose", "base_velocity", "torso",
-                     "tiago_head_image",
-                     ]),
-                 ):
-        
-        self.frequency = frequency
-        self.reset_pose = reset_pose
-        self.all_act_keys = all_act_keys
-        self.all_obs_keys = all_obs_keys
-        
-        ### initialize tiago core
-        self.tiago = Tiago(
-            head_policy=LookAtFixedPoint(reset_pose['head']),
-            base_enabled=True,
-            torso_enabled=True,
-            left_arm_enabled=True,
-            right_arm_enabled=True,
-            right_gripper_type='pal',
-            left_gripper_type='pal',
-            reset_pose=reset_pose,
-        )
-        
-        self.cameras = OrderedDict()
-        self.cameras['tiago_head'] = self.tiago.head.head_camera
-        
-        self.steps = 0
-        self.start_time = None
-        
-        ### reset tiago for execution
-        self.obs = self.reset(reset_arms=True, is_input_cont=True)
-
+    
     @property
     def state_space(self):
         st_space = OrderedDict()
@@ -102,8 +73,13 @@ class TiagoEnv:
     @property
     def observation_space(self):
         st_space = self.state_space.spaces
+        if not hasattr(self, 'all_obs_keys') or self.all_obs_keys is None:
+            self.all_obs_keys = list(st_space.keys())
         ob_space = OrderedDict()
         for key in self.all_obs_keys:
+            if key not in st_space:
+                print(f"[TiagoServer] Warning: observation key '{key}' not in state_space; skipping.")
+                continue
             ob_space[key] = st_space[key]
         return gym.spaces.Dict(ob_space)
     
@@ -154,7 +130,8 @@ class TiagoEnv:
 
     def _observation(self):
         states = self._state()
-        observations = {k: states[k] for k in self.all_obs_keys if k in states}
+        keys = getattr(self, 'all_obs_keys', states.keys())
+        observations = {k: states[k] for k in keys if k in states}
         return observations
 
     def step(self, action):

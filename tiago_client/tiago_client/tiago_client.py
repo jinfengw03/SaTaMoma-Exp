@@ -80,16 +80,35 @@ class TiagoClient:
                 summary[k] = f"error summarizing: {exc}"
         return summary
 
+    def _post_json(self, endpoint, payload=None, timeout=5.0):
+        """POST to the server and decode JSON with helpful errors."""
+        url = self.url + endpoint
+        try:
+            resp = requests.post(url, json=payload, timeout=timeout)
+        except Exception as exc:
+            raise RuntimeError(f"[TiagoClient] POST {url} failed: {exc}") from exc
+        if not resp.ok:
+            raise RuntimeError(
+                f"[TiagoClient] POST {url} returned {resp.status_code}: {resp.text[:300]}"
+            )
+        try:
+            return resp.json()
+        except Exception as exc:
+            snippet = resp.text[:300]
+            raise RuntimeError(
+                f"[TiagoClient] POST {url} returned non-JSON body: {snippet}"
+            ) from exc
+
     def _obtain_state_space(self):
-        data = requests.post(self.url + "tiago_get_state_space").json()
+        data = self._post_json("tiago_get_state_space")
         return reconstruct_space_dict(data)
     
     def _obtain_observation_space(self):
-        data = requests.post(self.url + "tiago_get_observation_space").json()
+        data = self._post_json("tiago_get_observation_space")
         return reconstruct_space_dict(data)
     
     def _obtain_action_space(self):
-        data = requests.post(self.url + "tiago_get_action_space").json()
+        data = self._post_json("tiago_get_action_space")
         return reconstruct_space_dict(data)
 
     def reset(self, reset_pose):
