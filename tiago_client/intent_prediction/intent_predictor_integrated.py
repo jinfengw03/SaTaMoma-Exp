@@ -33,7 +33,6 @@ class IntentPredictorIntegrated:
         
         # Temporary directory
         self.temp_dir = tempfile.mkdtemp()
-        print(f'[IntentPredictor] Temporary directory: {self.temp_dir}')
         
         # Check Ollama
         if not self.check_ollama():

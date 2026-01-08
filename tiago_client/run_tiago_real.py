@@ -13,12 +13,19 @@ def main():
     # Note: Ensure 'ollama' is installed and 'llava:7b' model is pulled
     predictor = IntentPredictorIntegrated(model_name='llava:7b', analysis_interval=5.0)
     
-    print("\n[REAL] Teleoperation started.")
-    print("Controls:")
-    print("- Right Trigger: Close Right Gripper")
-    print("- Left Trigger: Close Left Gripper")
-    print("- B Button: Reset Pose")
-    print("- Start/Menu: Exit\n")
+    # Print banner as single string to avoid terminal corruption from keyboard thread
+    banner = (
+        "\n[REAL] Teleoperation started\n"
+        "Controls:\n"
+        "  - Right Trigger : Close Right Gripper\n"
+        "  - Left Trigger  : Close Left Gripper\n"
+        "  - B Button      : Reset Pose\n"
+        "  - Start/Menu    : Exit\n"
+    )
+    print(banner, flush=True)
+    
+    # Start keyboard teleop AFTER all printing to prevent terminal corruption
+    client.start_teleop()
 
     try:
         while True:

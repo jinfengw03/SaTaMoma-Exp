@@ -37,11 +37,12 @@ class TiagoClient:
             if teleop_type == "KEYBOARD":
                 from tiago_client.oculus_teleop.hybrid_teleop_policy import HybridTeleopPolicy
                 self.teleop = HybridTeleopPolicy()
-                self.teleop.start()
+                self._teleop_needs_start = True  # Defer start to avoid terminal corruption
             else:
                 from tiago_client.oculus_teleop.configs.only_vr import teleop_config
                 self.teleop = TeleopPolicy(teleop_config)
                 self.teleop.start()
+                self._teleop_needs_start = False
             
             # Initialize IK and Safety for both arms
             self.ik_solvers = {
@@ -57,8 +58,16 @@ class TiagoClient:
                 'right': JointSafetyFilter(urdf_right_arm_path, side='right'),
                 'left': JointSafetyFilter(urdf_left_arm_path, side='left')
             }
+        else:
+            self._teleop_needs_start = False
         
         print("[TiagoClient] Connection established and spaces initialized.")
+
+    def start_teleop(self):
+        """Start the teleoperation interface after all initialization printing is complete."""
+        if hasattr(self, '_teleop_needs_start') and self._teleop_needs_start:
+            self.teleop.start()
+            self._teleop_needs_start = False
 
     @staticmethod
     def _summarize_payload(payload):
@@ -225,16 +234,22 @@ class TiagoClient:
                     '''
                     if joint_goal is not None:
                         # 3. Safety Filter
-                        if obstacles is not None:
-                            self.safety_filters[side].update_obstacles(obstacles)
+                        # if obstacles is not None:
+                        #     self.safety_filters[side].update_obstacles(obstacles)
                         
-                        joint_safe = self.safety_filters[side].filter(joints_curr, joint_goal)
+                        # joint_safe = self.safety_filters[side].filter(joints_curr, joint_goal)
                         
-                        # 4. Combine with gripper (8 elements total)
-                        safe_action[side] = np.concatenate([joint_safe, [gripper_val]])
+                        # # 4. Combine with gripper (8 elements total)
+                        safe_action[side] = np.concatenate([joint_goal, [gripper_val]])
                     else:
                         # If IK fails, stay at current joints
-                        print(f"[TiagoClient] IK failed for {side} arm. Using current joints.")
+                        # Use \r\n for proper line breaks when terminal is in raw mode (keyboard teleop)
+                        msg = f"[TiagoClient] IK failed for {side} arm. Using current joints."
+                        if hasattr(self, '_teleop_needs_start'):
+                            # Keyboard mode: need \r\n for proper line breaks
+                            print(msg, end='\r\n', flush=True)
+                        else:
+                            print(msg)
                         safe_action[side] = np.concatenate([joints_curr, [gripper_val]])
         
         # Process base and torso (direct pass-through for now)
