@@ -12,11 +12,14 @@ class HybridTeleopPolicy:
     Adapts the HybridTeleop (keyboard control) to the interface expected by TiagoClient.
     Provides get_action(obs) method.
     """
-    def __init__(self):
+    def __init__(self, verbose=False):
         # State
         # Default to Cartesian to match TiagoClient's IK pipeline
         self.mode = 'CARTESIAN' # 'JOINT' or 'CARTESIAN'
         self.lock = Lock()
+
+        # Disable console chatter by default; set verbose=True to re-enable
+        self.verbose = verbose
         
         # Control parameters
         self.cartesian_step = 0.02
@@ -47,8 +50,12 @@ class HybridTeleopPolicy:
         
     def start(self):
         self.key_thread.start()
-        print("Hybrid Teleop Policy Started (Keyboard)")
+        self._log("Hybrid Teleop Policy Started (Keyboard)")
         self._print_usage()
+
+    def _log(self, msg):
+        if self.verbose:
+            print(msg, flush=True)
 
     def _print_usage(self):
         # Short, multi-line block to reduce wrap/indent artifacts when mixed with other logs
@@ -61,7 +68,7 @@ class HybridTeleopPolicy:
             "Base: WASD move, QE rotate, Space stop | Torso: M up / N down | Gripper: P open / ; close",
             arm_help,
         ]
-        print("\n".join(lines), flush=True)
+        self._log("\n".join(lines))
 
     def _get_key(self):
         try:
@@ -135,7 +142,7 @@ class HybridTeleopPolicy:
                         elif key == 'x': self.joint_delta[6] -= self.joint_step
 
             except Exception as e:
-                print(f"Keyboard loop error: {e}")
+                self._log(f"Keyboard loop error: {e}")
 
     def get_action(self, obs, is_filter=False):
         """
@@ -198,7 +205,7 @@ class HybridTeleopPolicy:
                 # cartesian_delta = raw_action[side][:6]...
                 # So we can't easily pass joint angles without modifying client.
                 # We will just print warning for now.
-                print("Warning: JOINT mode not fully supported by standard TiagoClient teleop logic yet.")
+                self._log("Warning: JOINT mode not fully supported by standard TiagoClient teleop logic yet.")
                 action['right'] = None
                 # Clear joint delta so it never latches
                 self.joint_delta[:] = 0

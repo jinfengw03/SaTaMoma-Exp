@@ -117,7 +117,7 @@ class TiagoClient:
         :param reset_pose: Dictionary containing target positions for arms, base, torso, etc.
         """
         reset_pose_json = encode2json(reset_pose)
-        recept_json = requests.post(self.url + "tiago_reset", json={'reset_pose': reset_pose_json}).json()
+        recept_json = self._post_json("tiago_reset", payload={'reset_pose': reset_pose_json})
         return decode4json(recept_json)
 
     def step(self, action):
@@ -128,10 +128,11 @@ class TiagoClient:
         """
         action_json = encode2json(action)
         # print("[TiagoClient] -> /tiago_step action summary:", self._summarize_payload(action))
-        recept_json = requests.post(
-            self.url + "tiago_step", 
-            json={'action': action_json}
-        ).json()
+        recept_json = self._post_json(
+            "tiago_step",
+            payload={'action': action_json},
+            timeout=10.0
+        )
         # print("[TiagoClient] <- /tiago_step response keys:", list(recept_json.keys()))
         
         obs = decode4json(recept_json['obs'])
@@ -140,12 +141,12 @@ class TiagoClient:
 
     def get_state(self):
         """Retrieves the full state of the robot including visual data."""
-        data = requests.post(self.url + "tiago_get_state").json()
+        data = self._post_json("tiago_get_state")
         return decode4json(data)
     
     def get_state_wo_vis(self):
         """Retrieves the robot state without heavy visual data (joints, poses only)."""
-        data = requests.post(self.url + "tiago_get_state_wo_vis").json()
+        data = self._post_json("tiago_get_state_wo_vis")
         return decode4json(data)
 
     def get_oculus_state(self):

@@ -32,7 +32,20 @@ class TiagoEnv:
                      'right': [0.43, -0.81, 1.60, 1.78, 1.34, -0.49, 1.15, 1]
                  }):
         
-        self.tiago = Tiago(frequency=frequency)
+        self.frequency = frequency
+        self.start_time = None
+        self.steps = 0
+        # Construct Tiago with explicit capability flags (no frequency arg supported)
+        self.tiago = Tiago(
+            head_policy=LookAtFixedPoint([0.0, 0.0]),
+            base_enabled=True,
+            torso_enabled=True,
+            right_arm_enabled=True,
+            left_arm_enabled=True,
+            right_gripper_type='pal',
+            left_gripper_type='pal',
+            reset_pose=reset_pose,
+        )
         self.cameras = OrderedDict()
 
         # Observation keys the server will expose; defaults to all state keys.
