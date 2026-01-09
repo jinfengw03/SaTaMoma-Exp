@@ -173,11 +173,12 @@ class TiagoClient:
         except Exception:
             return None
 
-    def get_teleop_action(self, is_filter=False, obstacles=None):
+    def get_teleop_action(self, is_filter=False, obstacles=None, assist_target=None):
         """
         Reads the current VR controller input and calculates the robot action.
         :param is_filter: Whether to use the teleop policy's internal filter
         :param obstacles: List of [x, y, z, r] for the safety filter
+        :param assist_target: Optional [x, y, z] target to attract the hand towards
         :return: (safe_action, buttons)
         """
         if self.teleop is None:
@@ -224,6 +225,13 @@ class TiagoClient:
                 target_pos = cur_pos + pos_delta
                 target_euler = add_angles(euler_delta, cur_euler)
                 target_quat = euler_to_quat(target_euler)
+                
+                # --- Shared Control / Assistance ---
+                if assist_target is not None and side == 'right': # Assuming dominant hand for now
+                    # Simple linear blending or attraction
+                    # Pull target_pos towards assist_target
+                    alpha = 0.05 # Strength of assistance (0-1)
+                    target_pos = target_pos + alpha * (np.array(assist_target) - target_pos)
                 
                 # 2. Local IK
                 joints_curr = state.get(f'{side}_joints')

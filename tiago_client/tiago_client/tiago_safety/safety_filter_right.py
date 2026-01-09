@@ -106,8 +106,8 @@ class JointSafetyFilter:
         robot_collision_positions = robot_collision_pos_rad[:, :3]
         robot_collision_radii = robot_collision_pos_rad[:, 3]
         
-        obs_positions = self.cbf.config.collision_positions
-        obs_radii = self.cbf.config.collision_radii
+        obs_positions = np.array(self.cbf.config.collision_positions)
+        obs_radii = np.array(self.cbf.config.collision_radii)
         
         cbf_enabled = False
         if obs_positions.size > 0:

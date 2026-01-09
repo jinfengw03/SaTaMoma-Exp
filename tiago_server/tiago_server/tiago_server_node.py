@@ -124,6 +124,7 @@ class TiagoEnv:
             'base_pose': np.array(self.tiago.base.get_delta_pose()),
             'base_velocity': np.array(self.tiago.base.get_velocity()),
             'torso': np.array(self.tiago.torso.get_torso_extension()),
+            'obstacles': np.array(self.detected_spheres),
         })
         for cam in self.cameras.keys():
             states[f'{cam}_image'] = np.array(self.cameras[cam].get_img())

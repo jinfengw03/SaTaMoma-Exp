@@ -33,7 +33,11 @@ def main():
             
             # 1. Get action from Oculus VR (includes IK and Safety Filter)
             # is_filter=True enables the teleop policy's internal smoothing
-            action, buttons = client.get_teleop_action(is_filter=True)
+            
+            # Check for shared control target
+            assist_target = predictor.suggested_target
+            
+            action, buttons = client.get_teleop_action(is_filter=True, assist_target=assist_target)
             
             if action is not None:
                 # 2. Send action to the robot via HTTP POST
@@ -57,8 +61,24 @@ def main():
                     elif isinstance(torso_val, list):
                         torso_val = torso_val[0] if torso_val else 0.0
 
+                    # Extract obstacles and EE pose
+                    obstacles = obs.get('obstacles', [])
+                    ee_pose = None
+                    if 'right' in obs:
+                         # Ensure it's treated as array/list
+                         r_data = obs['right']
+                         if hasattr(r_data, '__len__') and len(r_data) >= 7:
+                             ee_pose = r_data[:7]
+
                     # Update predictor state (non-blocking)
-                    predictor.update_state(image=img, joints=joints, base_vel=base_vel, torso=torso_val)
+                    predictor.update_state(
+                        image=img, 
+                        joints=joints, 
+                        base_vel=base_vel, 
+                        torso=torso_val,
+                        obstacles=obstacles,
+                        ee_pose=ee_pose
+                    )
                 
                 # Optional: Handle specific button presses
                 if buttons.get('B'):
