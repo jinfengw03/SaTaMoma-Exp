@@ -51,6 +51,21 @@ class TiagoEnv:
             reset_pose=reset_pose,
         )
         self.cameras = OrderedDict()
+        
+        # Initialize TIAGo head camera for perception
+        from tiago_server.tiago_sys.utils.camera_utils import Camera
+        try:
+            self.cameras['tiago_head'] = Camera(
+                img_topic='/xtion/rgb/image_raw',
+                depth_topic='/xtion/depth_registered/image_raw'
+            )
+            print("[TiagoServer] Head camera initialized")
+        except Exception as e:
+            print(f"[TiagoServer] Warning: Could not initialize head camera: {e}")
+
+        # Obstacle subscriber - initialize before reset() to avoid AttributeError
+        self.detected_spheres = []
+        self.sphere_sub = rospy.Subscriber('/detected_spheres', Float64MultiArray, self.sphere_callback)
 
         # Observation keys the server will expose; defaults to all state keys.
         # This prevents AttributeError when a new observation key is added but
@@ -59,9 +74,6 @@ class TiagoEnv:
         self.all_obs_keys = list(self.state_space.spaces.keys())
         # Reset TIAGo for execution
         self.obs = self.reset(reset_arms=True, is_input_cont=False)
-        # Obstacle subscriber
-        self.detected_spheres = []
-        self.sphere_sub = rospy.Subscriber('/detected_spheres', Float64MultiArray, self.sphere_callback)
 
     def sphere_callback(self, msg):
         # Format: [x1, y1, z1, r1, x2, y2, z2, r2, ...]

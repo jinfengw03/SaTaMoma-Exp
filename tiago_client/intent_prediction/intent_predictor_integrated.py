@@ -47,10 +47,12 @@ class IntentPredictorIntegrated:
         
         # Temporary directory
         self.temp_dir = tempfile.mkdtemp()
+        print(f'[IntentPredictor] Initialized. Temp dir: {self.temp_dir}', end='\r\n', flush=True)
+        print(f'[IntentPredictor] Analysis interval: {analysis_interval}s', end='\r\n', flush=True)
         
         # Check Ollama
         if not self.check_ollama():
-            print('[IntentPredictor] WARNING: Ollama not available or model not found.')
+            print('[IntentPredictor] WARNING: Ollama not available or model not found.', end='\r\n', flush=True)
         
         # Start analysis thread
         self.analysis_thread = threading.Thread(target=self.analysis_loop)
@@ -95,7 +97,7 @@ class IntentPredictorIntegrated:
         if speech is not None:
             self.latest_speech = speech
             self.speech_timestamp = time.time()
-            print(f'[IntentPredictor] Received speech: "{speech}"')
+            print(f'[IntentPredictor] Received speech: "{speech}"', end='\r\n', flush=True)
             
         if obstacles is not None:
             # Convert simple list of lists to dict format used by analysis
@@ -343,14 +345,14 @@ class IntentPredictorIntegrated:
         # NOTE: In a real integrated system, you might want to call TiagoClient methods here
         # instead of subprocess. But for now, we keep the script calling logic.
         if action_type == "APPROACH_TABLE":
-            print("[IntentPredictor] Executing: Approach Table")
+            print("[IntentPredictor] Executing: Approach Table", end='\r\n', flush=True)
             # Placeholder for actual execution logic
             # subprocess.run(["rosrun", "tiago_safety", "approach_table.py"], check=True)
             self.last_executed_action = "APPROACH_TABLE"
             self.last_action_time = time.time()
             
         elif action_type == "PICK_CHIPS":
-            print("[IntentPredictor] Executing: Pick Chips")
+            print("[IntentPredictor] Executing: Pick Chips", end='\r\n', flush=True)
             # Placeholder for actual execution logic
             self.last_executed_action = "PICK_CHIPS"
             self.last_action_time = time.time()
@@ -398,12 +400,12 @@ class IntentPredictorIntegrated:
             for pat in self.current_patterns:
                 if pat['type'] in target_pattern_type:
                     self.suggested_target = pat['position']
-                    print(f"[IntentPredictor] >> Locked on Target: {pat['type']} at {self.suggested_target}")
+                    print(f"[IntentPredictor] >> Locked on Target: {pat['type']} at {self.suggested_target}", end='\r\n', flush=True)
                     break
         
         # If we have a spatial target, we can enable shared control
         if self.suggested_target is not None and confidence_score > 0.75:
-             print(f"[IntentPredictor] >> SHARED CONTROL ACTIVE: Assisting towards {action_desc}")
+             print(f"[IntentPredictor] >> SHARED CONTROL ACTIVE: Assisting towards {action_desc}", end='\r\n', flush=True)
              # We rely on the main loop to read self.suggested_target
 
         if action_candidate:
@@ -411,19 +413,20 @@ class IntentPredictorIntegrated:
                  if self.last_action_time and (time.time() - self.last_action_time) < 60.0:
                      return
 
-            print("\n" + "!"*60)
-            print(f">>> PROPOSED ACTION: {action_desc}")
+            print("\r\n" + "!"*60, end='\r\n', flush=True)
+            print(f">>> PROPOSED ACTION: {action_desc}", end='\r\n', flush=True)
             if confidence_report:
-                print(f">>> Confidence: {confidence_report['total']*100:.1f}%")
-            print(">>> Do you want to execute this action? (y/n): ", end='', flush=True)
+                print(f">>> Confidence: {confidence_report['total']*100:.1f}%", end='\r\n', flush=True)
+            print(">>> Do you want to execute this action? (y/n): ", end='\r\n', flush=True)
             
             # Non-blocking input is hard in a loop, so we might just print the suggestion
             # or use a separate thread for input if strictly necessary.
             # For safety in a real-time loop, we usually don't block on input().
-            print("\n(Auto-execution disabled for safety in integrated mode)")
-            print("!"*60 + "\n")
+            print("\r\n(Auto-execution disabled for safety in integrated mode)", end='\r\n', flush=True)
+            print("!"*60 + "\r\n", end='\r\n', flush=True)
 
     def analysis_loop(self):
+        print('[IntentPredictor] Analysis thread started', end='\r\n', flush=True)
         while self.running:
             current_time = time.time()
             if (current_time - self.last_analysis_time) >= self.analysis_interval:
@@ -431,12 +434,14 @@ class IntentPredictorIntegrated:
                     try:
                         self.analyze_current_state()
                     except Exception as e:
-                        print(f"[IntentPredictor] Analysis Error: {e}")
+                        print(f"[IntentPredictor] Analysis Error: {e}", end='\r\n', flush=True)
                     self.last_analysis_time = current_time
+                else:
+                    print('[IntentPredictor] Waiting for image data...', end='\r\n', flush=True)
             time.sleep(0.1)
 
     def analyze_current_state(self):
-        print('[IntentPredictor] Analyzing current state...')
+        print('[IntentPredictor] Analyzing current state...', end='\r\n', flush=True)
         if self.latest_image is None: 
             return
             
@@ -452,9 +457,12 @@ class IntentPredictorIntegrated:
         # Calculate confidence
         conf_report = self.calculate_weighted_confidence(response)
         
-        print(f'[IntentPredictor] Result:\n{response}')
-        print(f'Confidence scrore: {conf_report["total"]:.2f}')
-        print("-" * 40)
+        # Replace \n with \r\n in response for proper terminal display in raw mode
+        response_formatted = response.replace('\n', '\r\n')
+        
+        print(f'[IntentPredictor] Result:\r\n{response_formatted}', end='\r\n', flush=True)
+        print(f'Confidence score: {conf_report["total"]:.2f}', end='\r\n', flush=True)
+        print("-" * 40, end='\r\n', flush=True)
         
         self.check_and_prompt_action(response, conf_report)
 
