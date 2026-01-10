@@ -260,10 +260,12 @@ class TiagoClient:
                             print(msg)
                         safe_action[side] = np.concatenate([joints_curr, [gripper_val]])
         
-        # Process base and torso (direct pass-through for now)
+        # Process base, torso, and head (direct pass-through)
         if 'base' in raw_action:
             safe_action['base'] = raw_action['base']
         if 'torso' in raw_action:
             safe_action['torso'] = raw_action['torso']
+        if 'head' in raw_action:
+            safe_action['head'] = raw_action['head']
             
         return safe_action, buttons

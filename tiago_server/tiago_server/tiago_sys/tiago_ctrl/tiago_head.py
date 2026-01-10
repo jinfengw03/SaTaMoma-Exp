@@ -47,6 +47,13 @@ class TiagoHead:
         return self.head_camera.get_camera_obs()
 
     def step(self, env_action):
+        # If 'head' action is explicitly provided, use it directly (for teleop)
+        if isinstance(env_action, dict) and 'head' in env_action and env_action['head'] is not None:
+            pose = env_action['head']
+            self.write(pose)
+            return
+        
+        # Otherwise, use the policy
         pose = self.head_policy.get_action(env_action)
         if pose is None:
             return

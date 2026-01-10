@@ -151,6 +151,11 @@ class HybridTeleopPolicy:
         if not self.torso_initialized and obs.torso is not None:
             self.torso_cmd = obs.torso
             self.torso_initialized = True
+        
+        # Initialize head from observation once
+        if not self.head_initialized and hasattr(obs, 'head') and obs.head is not None:
+            self.head_cmd = list(obs.head) if hasattr(obs.head, '__iter__') else [0.0, 0.0]
+            self.head_initialized = True
 
         action = {}
         extra = {'buttons': {}} # Placeholder
