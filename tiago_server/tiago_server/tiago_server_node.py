@@ -121,6 +121,7 @@ class TiagoEnv:
         act_space['right'] = gym.spaces.Box(low=-1e10, high=1e10, shape=(8,), dtype=np.float32)
         act_space['base'] = gym.spaces.Box(low=-1e10, high=1e10, shape=(3,), dtype=np.float32)
         act_space['torso'] = gym.spaces.Box(low=-1e10, high=1e10, shape=(1,), dtype=np.float32)
+        act_space['head'] = gym.spaces.Box(low=-1e10, high=1e10, shape=(2,), dtype=np.float32)
         return gym.spaces.Dict(act_space)
 
     def _state(self):

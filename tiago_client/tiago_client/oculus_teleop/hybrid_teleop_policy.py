@@ -29,6 +29,8 @@ class HybridTeleopPolicy:
         self.torso_cmd = 0.0        # absolute position, needs sync with obs
         self.gripper_cmd = 0.0      # 0.0 (closed) to 1.0 (open)
         self._last_gripper_cmd = 0.0
+        self.head_cmd = [0.0, 0.0]  # [pan, tilt] - absolute positions
+        self.head_initialized = False
         
         # For cartesian/joint delta accumulation
         self.cartesian_delta = np.zeros(6) # x, y, z, roll, pitch, yaw
@@ -57,8 +59,9 @@ class HybridTeleopPolicy:
         try:
             tty.setraw(sys.stdin.fileno())
             key = sys.stdin.read(1)
-            # Handle escape sequences if needed (arrow keys etc)
-            # For simplicity, we stick to char keys
+            # Handle escape sequences for arrow keys
+            if key == '\x1b':  # ESC sequence
+                key += sys.stdin.read(2)  # Read the next 2 chars
             return key
         finally:
             termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.settings)
@@ -93,6 +96,18 @@ class HybridTeleopPolicy:
                     # Gripper
                     if key == 'p': self.gripper_cmd = 1.0
                     elif key == ';': self.gripper_cmd = 0.0
+
+                    # Head Control (Arrow Keys)
+                    # Pan: left/right (head_1_joint), Tilt: up/down (head_2_joint)
+                    head_step = 0.1
+                    if key == '\x1b[C':  # Right arrow
+                        self.head_cmd[0] = max(self.head_cmd[0] - head_step, -1.3)
+                    elif key == '\x1b[D':  # Left arrow
+                        self.head_cmd[0] = min(self.head_cmd[0] + head_step, 1.3)
+                    elif key == '\x1b[A':  # Up arrow
+                        self.head_cmd[1] = max(self.head_cmd[1] - head_step, -1.05)
+                    elif key == '\x1b[B':  # Down arrow
+                        self.head_cmd[1] = min(self.head_cmd[1] + head_step, 0.785)
 
                     # Arm Control
                     if self.mode == 'CARTESIAN':
@@ -150,6 +165,9 @@ class HybridTeleopPolicy:
             # Clip accumulated torso command
             self.torso_cmd = max(0.0, min(0.35, self.torso_cmd))
             action['torso'] = np.array([self.torso_cmd])
+
+            # Head
+            action['head'] = np.array(self.head_cmd)
 
             # Right Arm
             # We construct a 7+1 vector: 7 joints/pose + 1 gripper
