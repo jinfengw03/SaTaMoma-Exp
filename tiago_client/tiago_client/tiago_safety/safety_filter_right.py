@@ -10,9 +10,13 @@ class CollisionsVelocityConfig(OSCBFVelocityConfig):
         robot: Manipulator,
         collision_positions: np.ndarray = np.array([]),
         collision_radii: np.ndarray = np.array([]),
+        plane_z_min: float = 0.0,
+        plane_enabled: bool = True,
     ):
         self.collision_positions = jnp.atleast_2d(collision_positions)
         self.collision_radii = jnp.ravel(collision_radii)
+        self.plane_z_min = float(plane_z_min)
+        self.plane_enabled = bool(plane_enabled)
         super(CollisionsVelocityConfig, self).__init__(robot)
 
     def h_1(self, z, **kwargs):
@@ -20,7 +24,7 @@ class CollisionsVelocityConfig(OSCBFVelocityConfig):
         robot_collision_pos_rad = self.robot.link_collision_data(q)
         robot_collision_positions = robot_collision_pos_rad[:, :3]
         robot_collision_radii = robot_collision_pos_rad[:, 3, None]
-        h_collision = jnp.array([1.0])
+        h_list = []
         if self.collision_positions.size > 0:
             center_deltas = (
                 robot_collision_positions[:, None, :] - self.collision_positions[None, :, :]
@@ -28,8 +32,18 @@ class CollisionsVelocityConfig(OSCBFVelocityConfig):
             radii_sums = (
                 robot_collision_radii[:, None] + self.collision_radii[None, :]
             ).reshape(-1)
-            h_collision = jnp.linalg.norm(center_deltas, axis=1) - radii_sums
-        return h_collision
+            h_list.append(jnp.linalg.norm(center_deltas, axis=1) - radii_sums)
+
+        # Plane constraint (e.g., keep robot collision spheres above a tabletop plane)
+        # Enforce: (z - radius) - plane_z_min >= 0 for each robot collision sphere
+        if self.plane_enabled:
+            z_vals = robot_collision_positions[:, 2:3]
+            h_plane = (z_vals - robot_collision_radii) - self.plane_z_min
+            h_list.append(jnp.ravel(h_plane))
+
+        if len(h_list) == 0:
+            return jnp.array([1.0])
+        return jnp.concatenate(h_list, axis=0)
 
     def alpha(self, h):
         return 10.0 * h
@@ -75,17 +89,38 @@ class JointSafetyFilter:
         self.motion_blocked = False
         self.threshold = 0.87
 
+        # Plane safety constraint (torso_lift_link frame)
+        # Keep robot collision spheres above z >= table_height
+        self.plane_enabled = True
+        self.table_height = 0.0
+        self.plane_threshold = 0.05  # start CBF when within 5cm of plane
+
+        # Cache last obstacles so we can rebuild CBF when table height changes
+        self._last_obstacles = []
+
+    def set_table_height(self, table_height: float):
+        """Set tabletop height (z) in torso_lift_link frame and rebuild CBF."""
+        self.table_height = float(table_height)
+        # Rebuild with latest obstacles so plane constraint takes effect immediately
+        self.update_obstacles(self._last_obstacles)
+
     def update_obstacles(self, obstacles):
         """
         Update the obstacles for the CBF.
         :param obstacles: List of [x, y, z, r] in torso_lift_link frame
         """
+        self._last_obstacles = obstacles if obstacles is not None else []
         obs_array = np.array(obstacles) if obstacles else np.array([])
-        self.cbf = CBF.from_config(CollisionsVelocityConfig(
-            robot=self.robot,
-            collision_positions=obs_array[:, :3] if obs_array.size else np.array([]),
-            collision_radii=obs_array[:, 3] if obs_array.size else np.array([])
-        ))
+        # Always build a CBF when plane constraint is enabled, even if there are no obstacle spheres.
+        self.cbf = CBF.from_config(
+            CollisionsVelocityConfig(
+                robot=self.robot,
+                collision_positions=obs_array[:, :3] if obs_array.size else np.array([]),
+                collision_radii=obs_array[:, 3] if obs_array.size else np.array([]),
+                plane_z_min=self.table_height,
+                plane_enabled=self.plane_enabled,
+            )
+        )
 
     def filter(self, q_curr, q_target, dt=0.1):
         """
@@ -110,6 +145,8 @@ class JointSafetyFilter:
         obs_radii = np.array(self.cbf.config.collision_radii)
         
         cbf_enabled = False
+
+        # 1) Sphere obstacle constraints
         if obs_positions.size > 0:
             center_deltas = (
                 robot_collision_positions[:, None, :] - obs_positions[None, :, :]
@@ -124,6 +161,14 @@ class JointSafetyFilter:
                 return q_curr
                 
             cbf_enabled = np.any(h_collision <= self.threshold)
+
+        # 2) Plane constraint: (z - radius) - plane_z_min >= 0
+        if self.plane_enabled:
+            h_plane = (robot_collision_positions[:, 2] - robot_collision_radii) - float(self.table_height)
+            if np.any(h_plane < 0):
+                self.motion_blocked = True
+                return q_curr
+            cbf_enabled = cbf_enabled or np.any(h_plane <= float(self.plane_threshold))
 
         if cbf_enabled:
             u_nom = (q_target - q_curr) / dt

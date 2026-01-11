@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
 import sys
+import json
+from pathlib import Path
 import numpy as np
 import rospy
 from sensor_msgs.msg import Image, CameraInfo, PointCloud2, PointField
@@ -45,6 +47,25 @@ class PointCloudToSpheres:
         self.depth_image = None
         self.last_depth_time = None
 
+        # --- Offline / Predefined Environment Mode ---
+        # mode: live | record | playback
+        self.mode = rospy.get_param('~mode', 'live').strip().lower()
+        self.record_path = rospy.get_param('~record_path', str(Path.home() / 'tiago_predefined_spheres.json'))
+        self.playback_rate_hz = float(rospy.get_param('~playback_rate_hz', 10.0))
+        self.z_min = float(rospy.get_param('~z_min', 0.0))
+        self.xyz_offset = rospy.get_param('~xyz_offset', [0.0, 0.0, 0.0])
+        self.radius_scale = float(rospy.get_param('~radius_scale', 1.0))
+        self.radius_min = float(rospy.get_param('~radius_min', 0.0))
+        self.radius_max = float(rospy.get_param('~radius_max', 10.0))
+        self._playback_cache = None
+        self._playback_mtime = None
+
+        # Camera projection convention controls
+        # By default, follow ROS optical frame: x right, y down, z forward.
+        # If your TF tree/sensor driver uses a different convention, you can flip axes.
+        self.negate_x = bool(rospy.get_param('~negate_x', False))
+        self.negate_y = bool(rospy.get_param('~negate_y', False))
+
         # TF 设置（ROS1）
         self.tf_listener = tf.TransformListener()
 
@@ -54,36 +75,42 @@ class PointCloudToSpheres:
         self.marker_pub = rospy.Publisher('/sphere_markers', MarkerArray, queue_size=10)
         self.pointcloud_pub = rospy.Publisher('/camera_pointcloud', PointCloud2, queue_size=10)
 
-        # 订阅相机信息（使用 xtion 相机）
-        self.camera_info_sub = rospy.Subscriber(
-            '/xtion/rgb/camera_info',
-            CameraInfo,
-            self.camera_info_callback,
-            queue_size=10)
+        if self.mode != 'playback':
+            # 订阅相机信息（使用 xtion 相机）
+            self.camera_info_sub = rospy.Subscriber(
+                '/xtion/rgb/camera_info',
+                CameraInfo,
+                self.camera_info_callback,
+                queue_size=10)
 
-        # 订阅 RGB 图像
-        self.rgb_sub = rospy.Subscriber(
-            '/xtion/rgb/image_raw',
-            Image,
-            self.rgb_callback,
-            queue_size=10)
+            # 订阅 RGB 图像
+            self.rgb_sub = rospy.Subscriber(
+                '/xtion/rgb/image_raw',
+                Image,
+                self.rgb_callback,
+                queue_size=10)
 
-        # 订阅深度图像（使用 depth_registered）
-        self.depth_sub = rospy.Subscriber(
-            '/xtion/depth_registered/image_raw',
-            Image,
-            self.depth_callback,
-            queue_size=10)
+            # 订阅深度图像（使用 depth_registered）
+            self.depth_sub = rospy.Subscriber(
+                '/xtion/depth_registered/image_raw',
+                Image,
+                self.depth_callback,
+                queue_size=10)
 
-        # 定时器：每 0.5 秒生成点云和球体
-        self.timer = rospy.Timer(rospy.Duration(0.5), self.process_pointcloud)
+            # 定时器：每 0.5 秒生成点云和球体
+            self.timer = rospy.Timer(rospy.Duration(0.5), self.process_pointcloud)
 
-        rospy.loginfo('订阅话题：/xtion/rgb/image_raw, /xtion/depth_registered/image_raw, /xtion/rgb/camera_info')
-        rospy.loginfo('等待相机数据...')
+            rospy.loginfo('订阅话题：/xtion/rgb/image_raw, /xtion/depth_registered/image_raw, /xtion/rgb/camera_info')
+            rospy.loginfo('等待相机数据...')
+        else:
+            # Playback mode: no camera subscriptions
+            self.timer = rospy.Timer(rospy.Duration(1.0 / max(self.playback_rate_hz, 0.5)), self.publish_from_file)
+
+        rospy.loginfo(f'[PointCloudToSpheres] mode={self.mode} record_path={self.record_path}')
+        rospy.loginfo(f'[PointCloudToSpheres] z_min={self.z_min} xyz_offset={self.xyz_offset} radius_scale={self.radius_scale}')
         rospy.loginfo('RViz 可视化已启用：')
         rospy.loginfo('  - 球体中心: /sphere_markers (MarkerArray)')
         rospy.loginfo('  - 点云: /camera_pointcloud (PointCloud2)')
-        rospy.loginfo('  - 打开 RViz 并添加这些话题进行可视化')
 
         # 预定义机械臂球体数据
         self.arm_right_link_names = [
@@ -113,6 +140,97 @@ class PointCloudToSpheres:
             0.07, 0.07,        # sphere_right_6, sphere_right_11
             0.07               # sphere_right_7
         ]
+
+    def _apply_filters_and_adjustments(self, spheres_xyzr, frame_id='torso_lift_link'):
+        """Apply z-min filtering and simple user adjustments.
+
+        spheres_xyzr: list of (x, y, z, r)
+        returns: filtered list of (x, y, z, r)
+        """
+        if spheres_xyzr is None:
+            return []
+
+        try:
+            dx, dy, dz = [float(v) for v in self.xyz_offset]
+        except Exception:
+            dx, dy, dz = 0.0, 0.0, 0.0
+
+        out = []
+        for x, y, z, r in spheres_xyzr:
+            x = float(x) + dx
+            y = float(y) + dy
+            z = float(z) + dz
+            r = float(r) * float(self.radius_scale)
+            r = max(self.radius_min, min(self.radius_max, r))
+            # Desktop constraint / safety: keep only obstacles above z_min
+            if z < self.z_min:
+                continue
+            out.append((x, y, z, r))
+        return out
+
+    def _save_spheres_json(self, spheres_xyzr, frame_id='torso_lift_link'):
+        path = Path(self.record_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            'frame_id': frame_id,
+            'timestamp': time.time(),
+            'z_min': self.z_min,
+            'xyz_offset': self.xyz_offset,
+            'radius_scale': self.radius_scale,
+            'radius_min': self.radius_min,
+            'radius_max': self.radius_max,
+            'spheres': [[float(x), float(y), float(z), float(r)] for x, y, z, r in spheres_xyzr],
+        }
+        tmp = path.with_suffix(path.suffix + '.tmp')
+        tmp.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding='utf-8')
+        tmp.replace(path)
+
+    def _load_spheres_json_cached(self):
+        """Load spheres from record_path with mtime caching so edits take effect quickly."""
+        path = Path(self.record_path)
+        if not path.exists():
+            return None
+        mtime = path.stat().st_mtime
+        if self._playback_cache is not None and self._playback_mtime == mtime:
+            return self._playback_cache
+        try:
+            data = json.loads(path.read_text(encoding='utf-8'))
+        except Exception as e:
+            rospy.logwarn(f'[PointCloudToSpheres] Failed to load spheres file: {path} err={e}')
+            return None
+        spheres = data.get('spheres', [])
+        # Normalize to list of tuples
+        xyzr = []
+        for s in spheres:
+            if isinstance(s, (list, tuple)) and len(s) >= 4:
+                xyzr.append((s[0], s[1], s[2], s[3]))
+        self._playback_cache = {
+            'frame_id': data.get('frame_id', 'torso_lift_link'),
+            'spheres_xyzr': xyzr,
+        }
+        self._playback_mtime = mtime
+        return self._playback_cache
+
+    def publish_from_file(self, event=None):
+        loaded = self._load_spheres_json_cached()
+        if loaded is None:
+            rospy.logwarn_throttle(5.0, f'[PointCloudToSpheres] playback: no file {self.record_path}')
+            return
+        frame_id = loaded['frame_id']
+        spheres_xyzr = self._apply_filters_and_adjustments(loaded['spheres_xyzr'], frame_id=frame_id)
+        self._publish_spheres(spheres_xyzr, frame_id=frame_id)
+
+    def _publish_spheres(self, spheres_xyzr, frame_id='torso_lift_link'):
+        sphere_msg = Float64MultiArray()
+        flat_data = []
+        for x, y, z, r in spheres_xyzr:
+            flat_data.extend([float(x), float(y), float(z), float(r)])
+        sphere_msg.data = flat_data
+        self.sphere_pub.publish(sphere_msg)
+        # RViz markers
+        if len(spheres_xyzr) > 0:
+            sphere_markers = [((x, y, z), r) for x, y, z, r in spheres_xyzr]
+            self.publish_sphere_markers(sphere_markers, frame_id=frame_id)
 
     def camera_info_callback(self, msg):
         if self.camera_info is None:
@@ -163,8 +281,16 @@ class PointCloudToSpheres:
         # 参考代码使用 z < 0.87 来聚焦于近距离障碍物检测
         valid = (z > 0) & (z < 0.87) & (np.isfinite(z))
         z = z[valid]
-        x = - (u[valid] - cx) * z / fx
-        y = - (v[valid] - cy) * z / fy
+        # ROS optical frame convention (REP 103):
+        #   x = (u - cx) * z / fx  (right)
+        #   y = (v - cy) * z / fy  (down)
+        #   z = depth (forward)
+        x = (u[valid] - cx) * z / fx
+        y = (v[valid] - cy) * z / fy
+        if self.negate_x:
+            x = -x
+        if self.negate_y:
+            y = -y
 
         points = np.vstack((x, y, z)).T
         
@@ -501,19 +627,20 @@ class PointCloudToSpheres:
         # 直接使用过滤后的数据，不进行NMS去重
         nms_spheres = filtered_sphere_data
 
-        sphere_msg = Float64MultiArray()
-        flat_data = []
-        for center_x, center_y, center_z, radius in nms_spheres:
-            flat_data.extend([center_x, center_y, center_z, radius])
-        sphere_msg.data = flat_data
-        self.sphere_pub.publish(sphere_msg)
+        # Apply z-min and optional adjustments
+        nms_spheres = self._apply_filters_and_adjustments(nms_spheres, frame_id='torso_lift_link')
+
+        # Publish
+        self._publish_spheres(nms_spheres, frame_id='torso_lift_link')
         rospy.loginfo(f'已发布 {len(nms_spheres)} 个球体到 /detected_spheres')
-        
-        # 发布球体中心标记到 RViz（使用 torso_lift_link 坐标系，与球体数据坐标系一致）
-        if len(nms_spheres) > 0:
-            # 将 nms_spheres 转换为 (center, radius) 格式
-            sphere_markers = [((x, y, z), r) for x, y, z, r in nms_spheres]
-            self.publish_sphere_markers(sphere_markers, frame_id='torso_lift_link')
+
+        # Record offline spheres if enabled
+        if self.mode == 'record':
+            try:
+                self._save_spheres_json(nms_spheres, frame_id='torso_lift_link')
+                rospy.loginfo_throttle(2.0, f'[PointCloudToSpheres] saved spheres -> {self.record_path}')
+            except Exception as e:
+                rospy.logwarn_throttle(2.0, f'[PointCloudToSpheres] save failed: {e}')
 
 def main(args=None):
     try:

@@ -49,3 +49,7 @@ python tiago_client/run_tiago_real.py
 - **`intent_predictor_integrated.py`**: The brain. Runs the VLM loop, analyzes geometry, and calculates confidence.
 - **`tiago_client.py`**: The body. Receives VR inputs, mixes them with the "Assistance Force" from the predictor, and sends safe commands to the robot.
 - **`run_tiago_real.py`**: The coordinator. extracting state (Images, Obstacles, EE Pose) and passing it between the Client and Predictor.
+
+## Predefined Tabletop Obstacles (Offline)
+
+See `tiago_server/tiago_server/perception/README_predefined_spheres.md` for recording and replaying `/detected_spheres` from a predefined tabletop environment.
