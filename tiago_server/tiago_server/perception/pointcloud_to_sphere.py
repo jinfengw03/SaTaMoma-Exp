@@ -67,10 +67,13 @@ class PointCloudToSpheres:
 
         # Topics / frames (private params)
         # Defaults match the xtion topics used in the existing setup.
+        # NOTE: If using /xtion/depth/image_raw, you MUST also set:
+        #   camera_info_topic to /xtion/depth/camera_info
+        #   camera_frame to xtion_depth_optical_frame
         self.rgb_image_topic = rospy.get_param('~rgb_image_topic', '/xtion/rgb/image_raw')
-        self.depth_image_topic = rospy.get_param('~depth_image_topic', '/xtion/depth_registered/image_raw')
-        self.camera_info_topic = rospy.get_param('~camera_info_topic', '/xtion/rgb/camera_info')
-        self.camera_frame = rospy.get_param('~camera_frame', 'xtion_rgb_optical_frame')
+        self.depth_image_topic = rospy.get_param('~depth_image_topic', '/xtion/depth/image_raw')
+        self.camera_info_topic = rospy.get_param('~camera_info_topic', '/xtion/depth/camera_info')
+        self.camera_frame = rospy.get_param('~camera_frame', 'xtion_depth_optical_frame')
 
         # Open3D voxel downsample
         self.use_open3d_voxel = bool(rospy.get_param('~use_open3d_voxel', True))
@@ -295,7 +298,22 @@ class PointCloudToSpheres:
 
     def depth_callback(self, msg):
         try:
-            self.depth_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='32FC1')
+            # Log the incoming encoding to debug
+            rospy.loginfo_once('Depth image encoding: %s', msg.encoding)
+            
+            # Try to handle both 16UC1 (raw depth in mm) and 32FC1 (depth in meters)
+            if msg.encoding == '16UC1':
+                # Raw depth in millimeters, convert to meters
+                depth_mm = self.bridge.imgmsg_to_cv2(msg, desired_encoding='16UC1')
+                self.depth_image = depth_mm.astype(np.float32) / 1000.0
+                rospy.loginfo_once('Converted 16UC1 depth (mm) to float32 (m)')
+            else:
+                # Already in meters (32FC1 or passthrough)
+                self.depth_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
+                if self.depth_image.dtype != np.float32:
+                    self.depth_image = self.depth_image.astype(np.float32)
+                rospy.loginfo_once('Using depth as-is: %s', str(self.depth_image.dtype))
+            
             self.last_depth_time = msg.header.stamp
             rospy.loginfo_once('Depth image received.')
             rospy.logdebug('Depth stamp: %s', str(self.last_depth_time))
@@ -324,6 +342,12 @@ class PointCloudToSpheres:
 
         # Keep valid, near-range points
         valid = (z > 0) & (z < 0.87) & (np.isfinite(z))
+        
+        # Debug: log stats before filtering
+        rospy.loginfo_once('Depth stats: min=%.3f max=%.3f mean=%.3f valid_ratio=%.2f%%',
+                          float(np.nanmin(z)), float(np.nanmax(z)), float(np.nanmean(z)),
+                          100.0 * np.sum(valid) / z.size)
+        
         z = z[valid]
         # ROS optical frame convention (REP 103):
         #   x = (u - cx) * z / fx  (right)
@@ -506,6 +530,9 @@ class PointCloudToSpheres:
         """Publish sphere markers for RViz."""
         if frame_id is None:
             frame_id = self.camera_frame
+        
+        rospy.loginfo('Publishing %d sphere markers in frame: %s', len(spheres), frame_id)
+        
         marker_array = MarkerArray()
         
         # Delete all previous markers
@@ -513,12 +540,12 @@ class PointCloudToSpheres:
         delete_marker.action = Marker.DELETEALL
         marker_array.markers.append(delete_marker)
         
-        # Add current sphere centers
+        # Add current sphere centers (using ACTUAL sphere radius for scale)
         for i, (center, radius) in enumerate(spheres):
             marker = Marker()
             marker.header.frame_id = frame_id
-            marker.header.stamp = rospy.Time.now()
-            marker.ns = "sphere_centers"
+            marker.header.stamp = rospy.Time(0)  # Use latest transform
+            marker.ns = "detected_spheres"
             marker.id = i
             marker.type = Marker.SPHERE
             marker.action = Marker.ADD
@@ -528,21 +555,27 @@ class PointCloudToSpheres:
             marker.pose.position.z = center[2]
             marker.pose.orientation.w = 1.0
             
-            marker.scale.x = 0.05  # 5cm
-            marker.scale.y = 0.05
-            marker.scale.z = 0.05
+            # Use the actual sphere radius * 2 for diameter
+            diameter = radius * 2.0
+            marker.scale.x = diameter
+            marker.scale.y = diameter
+            marker.scale.z = diameter
             
+            # Semi-transparent red
             marker.color.r = 1.0
             marker.color.g = 0.0
             marker.color.b = 0.0
-            marker.color.a = 1.0
+            marker.color.a = 0.5
             
-            marker.lifetime = rospy.Duration(2.0)
+            marker.lifetime = rospy.Duration(5.0)  # Longer lifetime
             
             marker_array.markers.append(marker)
+            
+            rospy.loginfo('  Marker %d: pos=(%.3f, %.3f, %.3f) radius=%.3f frame=%s', 
+                         i, center[0], center[1], center[2], radius, frame_id)
         
         self.marker_pub.publish(marker_array)
-        rospy.logdebug_throttle(1.0, 'Published %d markers.', len(spheres))
+        rospy.loginfo('Published MarkerArray with %d markers to /sphere_markers', len(marker_array.markers))
 
     def process_pointcloud(self, event=None):  # ROS1 Timer callback requires the event arg
         # Generate point cloud from depth
