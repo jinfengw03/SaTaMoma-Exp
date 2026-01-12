@@ -1,14 +1,9 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
-import sys
-import json
-import time
-from pathlib import Path
-import numpy as np
 import rospy
+import numpy as np
 from sensor_msgs.msg import Image, CameraInfo, PointCloud2, PointField
 from std_msgs.msg import Header
-from cv_bridge import CvBridge
 from std_msgs.msg import Float64MultiArray
 import tf
 from geometry_msgs.msg import PointStamped
@@ -16,32 +11,8 @@ from sklearn.cluster import DBSCAN, KMeans
 from scipy.optimize import leastsq
 from visualization_msgs.msg import Marker, MarkerArray
 import struct
-
-try:
-    import open3d as o3d
-except Exception:  # pragma: no cover
-    o3d = None
-
-def sphere_nms(spheres, dist_thresh=0.02, radius_thresh=0.01):
-    # spheres: [(x, y, z, r, score), ...] or [(x, y, z, r)]
-    # If no score is provided, sort by radius desc.
-    if len(spheres) == 0:
-        return []
-    if len(spheres[0]) == 5:
-        spheres = sorted(spheres, key=lambda s: s[4], reverse=True)
-    else:
-        spheres = sorted(spheres, key=lambda s: s[3], reverse=True)
-    keep = []
-    for s in spheres:
-        suppress = False
-        for k in keep:
-            dist = np.linalg.norm(np.array(s[:3]) - np.array(k[:3]))
-            if dist < dist_thresh and abs(s[3] - k[3]) < radius_thresh:
-                suppress = True
-                break
-        if not suppress:
-            keep.append(s)
-    return keep
+from cv_bridge import CvBridge
+import open3d as o3d
 
 class PointCloudToSpheres:
     def __init__(self):
@@ -52,35 +23,20 @@ class PointCloudToSpheres:
         self.depth_image = None
         self.last_depth_time = None
 
-        # --- Offline / predefined environment mode ---
-        # mode: live | record | playback
-        self.mode = rospy.get_param('~mode', 'live').strip().lower()
-        self.record_path = rospy.get_param('~record_path', str(Path.home() / 'tiago_predefined_spheres.json'))
-        self.playback_rate_hz = float(rospy.get_param('~playback_rate_hz', 10.0))
-        self.z_min = float(rospy.get_param('~z_min', 0.0))
-        self.xyz_offset = rospy.get_param('~xyz_offset', [0.0, 0.0, 0.0])
-        self.radius_scale = float(rospy.get_param('~radius_scale', 1.0))
-        self.radius_min = float(rospy.get_param('~radius_min', 0.0))
-        self.radius_max = float(rospy.get_param('~radius_max', 10.0))
-        self._playback_cache = None
-        self._playback_mtime = None
-
-        # Topics / frames (private params)
-        # Defaults match the xtion topics used in the existing setup.
-        self.rgb_image_topic = rospy.get_param('~rgb_image_topic', '/xtion/rgb/image_raw')
-        self.depth_image_topic = rospy.get_param('~depth_image_topic', '/xtion/depth_registered/image_raw')
-        self.camera_info_topic = rospy.get_param('~camera_info_topic', '/xtion/rgb/camera_info')
-        self.camera_frame = rospy.get_param('~camera_frame', 'xtion_rgb_optical_frame')
+        # Topics (private params)
+        # Example:
+        #   rosrun tiago_safety pointcloud_to_sphere.py \
+        #     _rgb_image_topic:=/xtion/rgb/image_raw \
+        #     _depth_image_topic:=/xtion/depth_registered/image_raw \
+        #     _camera_info_topic:=/xtion/rgb/camera_info
+        self.rgb_image_topic = rospy.get_param('~rgb_image_topic', '/head_front_camera/rgb/image_raw')
+        self.depth_image_topic = rospy.get_param('~depth_image_topic', '/head_front_camera/depth/image_raw')
+        self.camera_info_topic = rospy.get_param('~camera_info_topic', '/head_front_camera/rgb/camera_info')
+        self.camera_frame = rospy.get_param('~camera_frame', 'head_front_camera_optical_frame')
 
         # Open3D voxel downsample
-        self.use_open3d_voxel = bool(rospy.get_param('~use_open3d_voxel', True))
+        self.use_open3d_voxel = rospy.get_param('~use_open3d_voxel', True)
         self.voxel_size = float(rospy.get_param('~voxel_size', 0.02))
-
-        # Camera projection convention controls
-        # By default, follow ROS optical frame: x right, y down, z forward.
-        # If your TF tree/sensor driver uses a different convention, you can flip axes.
-        self.negate_x = bool(rospy.get_param('~negate_x', False))
-        self.negate_y = bool(rospy.get_param('~negate_y', False))
 
         # TF (ROS1)
         self.tf_listener = tf.TransformListener()
@@ -91,73 +47,67 @@ class PointCloudToSpheres:
         self.marker_pub = rospy.Publisher('/sphere_markers', MarkerArray, queue_size=10)
         self.pointcloud_pub = rospy.Publisher('/camera_pointcloud', PointCloud2, queue_size=10)
 
-        if self.mode != 'playback':
-            self.camera_info_sub = rospy.Subscriber(
-                self.camera_info_topic,
-                CameraInfo,
-                self.camera_info_callback,
-                queue_size=10)
+        # Subscriptions
+        self.camera_info_sub = rospy.Subscriber(
+            self.camera_info_topic,
+            CameraInfo,
+            self.camera_info_callback,
+            queue_size=10)
 
-            self.rgb_sub = rospy.Subscriber(
-                self.rgb_image_topic,
-                Image,
-                self.rgb_callback,
-                queue_size=10)
+        self.rgb_sub = rospy.Subscriber(
+            self.rgb_image_topic,
+            Image,
+            self.rgb_callback,
+            queue_size=10)
 
-            self.depth_sub = rospy.Subscriber(
-                self.depth_image_topic,
-                Image,
-                self.depth_callback,
-                queue_size=10)
+        self.depth_sub = rospy.Subscriber(
+            self.depth_image_topic,
+            Image,
+            self.depth_callback,
+            queue_size=10)
 
-            self.timer = rospy.Timer(rospy.Duration(0.5), self.process_pointcloud)
-        else:
-            # Playback mode: no camera subscriptions
-            self.timer = rospy.Timer(rospy.Duration(1.0 / max(self.playback_rate_hz, 0.5)), self.publish_from_file)
+        # Timer: build pointcloud & spheres
+        self.timer = rospy.Timer(rospy.Duration(0.5), self.process_pointcloud)
 
         rospy.loginfo('Subscriptions:')
-        if self.mode != 'playback':
-            rospy.loginfo('  - rgb_image:    %s', self.rgb_image_topic)
-            rospy.loginfo('  - depth_image:  %s', self.depth_image_topic)
-            rospy.loginfo('  - camera_info:  %s', self.camera_info_topic)
-        else:
-            rospy.loginfo('  - playback_file: %s', self.record_path)
-            rospy.loginfo('  - playback_rate: %.2f Hz', self.playback_rate_hz)
+        rospy.loginfo('  - rgb_image:    %s', self.rgb_image_topic)
+        rospy.loginfo('  - depth_image:  %s', self.depth_image_topic)
+        rospy.loginfo('  - camera_info:  %s', self.camera_info_topic)
         rospy.loginfo('  - camera_frame: %s', self.camera_frame)
-        rospy.loginfo('  - voxel_size:   %.3f', self.voxel_size)
-        rospy.loginfo('  - open3d_voxel: %s', str(bool(self.use_open3d_voxel)))
-        rospy.loginfo('  - mode:         %s', self.mode)
+        rospy.loginfo('  - voxel_size:   %s', self.voxel_size)
+        rospy.loginfo('  - open3d_voxel: %s', self.use_open3d_voxel)
+        rospy.loginfo('Waiting for camera data...')
         rospy.loginfo('RViz topics:')
         rospy.loginfo('  - markers: /sphere_markers (MarkerArray)')
         rospy.loginfo('  - cloud:   /camera_pointcloud (PointCloud2)')
 
-        # Predefined right-arm spheres (used to filter arm points in torso_lift_link)
+        # Predefined arm spheres (for filtering in torso_lift_link)
         self.arm_right_link_names = [
-            'arm_right_1_link',  # sphere_right_1
-            'arm_right_2_link',  # sphere_right_2
-            'arm_right_3_link',  # sphere_right_3, sphere_right_9, sphere_right_10
-            'arm_right_4_link',  # sphere_right_4, sphere_right_8
-            'arm_right_5_link',  # sphere_right_5, sphere_right_12
-            'arm_right_6_link',  # sphere_right_6, sphere_right_11
-            'arm_right_7_link',  # sphere_right_7
+            'arm_right_1_link',
+            'arm_right_2_link',
+            'arm_right_3_link',
+            'arm_right_4_link',
+            'arm_right_5_link',
+            'arm_right_6_link',
+            'arm_right_7_link',
         ]
         self.sphere_offsets = [
-            [(0.0, 0.0, 0.0)],                                 # arm_right_1_link
-            [(0.0, 0.0, 0.0)],                                 # arm_right_2_link
-            [(0.0, 0.0, 0.0), (0.0, 0.0, -0.08), (0.0, 0.0, -0.16)],  # arm_right_3_link
-            [(0.0, 0.01, 0.02), (-0.08, 0.02, 0.01)],          # arm_right_4_link
-            [(0.0, 0.0, 0.02), (0.0, 0.0, 0.08)],              # arm_right_5_link
-            [(0.09, 0.0, 0.0), (0.15, 0.0, 0.0)],              # arm_right_6_link
-            [(0.0, 0.0, 0.0)],                                 # arm_right_7_link
+            [(0.0, 0.0, 0.0)],
+            [(0.0, 0.0, 0.0)],
+            [(0.0, 0.0, 0.0), (0.0, 0.0, -0.08), (0.0, 0.0, -0.16)],
+            [(0.0, 0.01, 0.02), (-0.08, 0.02, 0.01)],
+            [(0.0, 0.0, 0.02), (0.0, 0.0, 0.08)],
+            [(0.09, 0.0, 0.0), (0.15, 0.0, 0.0)],
+            [(0.0, 0.0, 0.0)],
         ]
         self.sphere_radii = [
-            0.08,      # sphere_right_1
-            0.07,      # sphere_right_2
-            0.07, 0.07, 0.07,  # sphere_right_3, sphere_right_9, sphere_right_10
-            0.08, 0.07,        # sphere_right_4, sphere_right_8
-            0.07, 0.07,        # sphere_right_5, sphere_right_12
-            0.07, 0.07,        # sphere_right_6, sphere_right_11
-            0.07               # sphere_right_7
+            0.08,
+            0.07,
+            0.07, 0.07, 0.07,
+            0.08, 0.07,
+            0.07, 0.07,
+            0.07, 0.07,
+            0.07,
         ]
 
     @staticmethod
@@ -166,7 +116,8 @@ class PointCloudToSpheres:
         if points is None or len(points) == 0:
             return points, colors
 
-        if voxel_size is None or float(voxel_size) <= 0:
+        # Invalid voxel size
+        if voxel_size is None or voxel_size <= 0:
             return points, colors
 
         pts = np.asarray(points)
@@ -185,97 +136,6 @@ class PointCloudToSpheres:
         if len(cols) != len(pts):
             return pts_ds, None
         return pts_ds, cols[unique_indices]
-
-    def _apply_filters_and_adjustments(self, spheres_xyzr, frame_id='torso_lift_link'):
-        """Apply z-min filtering and simple user adjustments.
-
-        spheres_xyzr: list of (x, y, z, r)
-        returns: filtered list of (x, y, z, r)
-        """
-        if spheres_xyzr is None:
-            return []
-
-        try:
-            dx, dy, dz = [float(v) for v in self.xyz_offset]
-        except Exception:
-            dx, dy, dz = 0.0, 0.0, 0.0
-
-        out = []
-        for x, y, z, r in spheres_xyzr:
-            x = float(x) + dx
-            y = float(y) + dy
-            z = float(z) + dz
-            r = float(r) * float(self.radius_scale)
-            r = max(self.radius_min, min(self.radius_max, r))
-            # Desktop constraint / safety: keep only obstacles above z_min
-            if z < self.z_min:
-                continue
-            out.append((x, y, z, r))
-        return out
-
-    def _save_spheres_json(self, spheres_xyzr, frame_id='torso_lift_link'):
-        path = Path(self.record_path)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        payload = {
-            'frame_id': frame_id,
-            'timestamp': time.time(),
-            'z_min': self.z_min,
-            'xyz_offset': self.xyz_offset,
-            'radius_scale': self.radius_scale,
-            'radius_min': self.radius_min,
-            'radius_max': self.radius_max,
-            'spheres': [[float(x), float(y), float(z), float(r)] for x, y, z, r in spheres_xyzr],
-        }
-        tmp = path.with_suffix(path.suffix + '.tmp')
-        tmp.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding='utf-8')
-        tmp.replace(path)
-
-    def _load_spheres_json_cached(self):
-        """Load spheres from record_path with mtime caching so edits take effect quickly."""
-        path = Path(self.record_path)
-        if not path.exists():
-            return None
-        mtime = path.stat().st_mtime
-        if self._playback_cache is not None and self._playback_mtime == mtime:
-            return self._playback_cache
-        try:
-            data = json.loads(path.read_text(encoding='utf-8'))
-        except Exception as e:
-            rospy.logwarn(f'[PointCloudToSpheres] Failed to load spheres file: {path} err={e}')
-            return None
-        spheres = data.get('spheres', [])
-        # Normalize to list of tuples
-        xyzr = []
-        for s in spheres:
-            if isinstance(s, (list, tuple)) and len(s) >= 4:
-                xyzr.append((s[0], s[1], s[2], s[3]))
-        self._playback_cache = {
-            'frame_id': data.get('frame_id', 'torso_lift_link'),
-            'spheres_xyzr': xyzr,
-        }
-        self._playback_mtime = mtime
-        return self._playback_cache
-
-    def publish_from_file(self, event=None):
-        loaded = self._load_spheres_json_cached()
-        if loaded is None:
-            rospy.logwarn_throttle(5.0, f'[PointCloudToSpheres] playback: no file {self.record_path}')
-            return
-        frame_id = loaded['frame_id']
-        spheres_xyzr = self._apply_filters_and_adjustments(loaded['spheres_xyzr'], frame_id=frame_id)
-        self._publish_spheres(spheres_xyzr, frame_id=frame_id)
-
-    def _publish_spheres(self, spheres_xyzr, frame_id='torso_lift_link'):
-        sphere_msg = Float64MultiArray()
-        flat_data = []
-        for x, y, z, r in spheres_xyzr:
-            flat_data.extend([float(x), float(y), float(z), float(r)])
-        sphere_msg.data = flat_data
-        self.sphere_pub.publish(sphere_msg)
-        # RViz markers
-        if len(spheres_xyzr) > 0:
-            sphere_markers = [((x, y, z), r) for x, y, z, r in spheres_xyzr]
-            self.publish_sphere_markers(sphere_markers, frame_id=frame_id)
 
     def camera_info_callback(self, msg):
         if self.camera_info is None:
@@ -325,16 +185,8 @@ class PointCloudToSpheres:
         # Keep valid, near-range points
         valid = (z > 0) & (z < 0.87) & (np.isfinite(z))
         z = z[valid]
-        # ROS optical frame convention (REP 103):
-        #   x = (u - cx) * z / fx  (right)
-        #   y = (v - cy) * z / fy  (down)
-        #   z = depth (forward)
-        x = (u[valid] - cx) * z / fx
-        y = (v[valid] - cy) * z / fy
-        if self.negate_x:
-            x = -x
-        if self.negate_y:
-            y = -y
+        x =  (u[valid] - cx) * z / fx
+        y =  (v[valid] - cy) * z / fy
 
         points = np.vstack((x, y, z)).T
         
@@ -342,8 +194,7 @@ class PointCloudToSpheres:
             rospy.logdebug_throttle(2.0, 'Valid points: 0')
             return None, None
 
-        rospy.logdebug_throttle(2.0, 'Valid points: %d, depth range: %.2fm-%.2fm',
-                                len(points), float(z.min()), float(z.max()))
+        rospy.logdebug_throttle(2.0, 'Valid points: %d, depth range: %.2fm-%.2fm', len(points), float(z.min()), float(z.max()))
 
         # Optional color
         colors = None
@@ -354,7 +205,7 @@ class PointCloudToSpheres:
         return points, colors
 
     def transform_center(self, center, target_frame='torso_lift_link'):
-        """Transform a 3D point from camera frame into target_frame."""
+        """Transform a 3D point from camera frame to target_frame."""
         point_stamped = PointStamped()
         point_stamped.header.frame_id = self.camera_frame
         # Use depth stamp for TF consistency
@@ -407,7 +258,7 @@ class PointCloudToSpheres:
         
         return params[:3], radius
 
-    def fit_and_subdivide(self, cluster_points, sphere_data, new_spheres, depth=0, max_depth=5, num_sub_clusters=3):
+    def fit_and_subdivide(self, cluster_points, sphere_data, depth=0, max_depth=5, num_sub_clusters=3):
         if depth > max_depth:
             rospy.logdebug('Reached max recursion depth; stop subdividing.')
             return
@@ -418,7 +269,6 @@ class PointCloudToSpheres:
         if radius < 0.05:
             sphere_data.append((center[0], center[1], center[2], radius))
             rospy.logdebug('Sphere: center=%s r=%.3f', np.array2string(np.asarray(center), precision=3), float(radius))
-            new_spheres.append((center, radius))
         else:
             rospy.logdebug('Sphere too large (r=%.3f); subdividing...', float(radius))
             kmeans = KMeans(n_clusters=num_sub_clusters, n_init=10).fit(cluster_points)
@@ -426,8 +276,9 @@ class PointCloudToSpheres:
             sub_unique_labels = np.unique(sub_labels)
             for sub_label in sub_unique_labels:
                 sub_cluster_points = cluster_points[sub_labels == sub_label]
-                self.fit_and_subdivide(sub_cluster_points, sphere_data, new_spheres, depth + 1, max_depth, num_sub_clusters + 1)
+                self.fit_and_subdivide(sub_cluster_points, sphere_data, depth + 1, max_depth, num_sub_clusters + 1)
 
+    # Predefined spheres in torso_lift_link (used to filter arm points)
     def get_predefined_spheres(self, stamp=None):
         if stamp is None:
             stamp = rospy.Time(0)
@@ -456,7 +307,7 @@ class PointCloudToSpheres:
                     radius_idx += 1
         
         rospy.logdebug('Predefined arm spheres: %d/%d transformed into %s.',
-                       len(positions), len(self.sphere_radii), target_frame)
+                   len(positions), len(self.sphere_radii), target_frame)
         return np.array(positions), np.array(radii)
 
     def publish_pointcloud(self, points, colors, frame_id=None):
@@ -506,6 +357,7 @@ class PointCloudToSpheres:
         """Publish sphere markers for RViz."""
         if frame_id is None:
             frame_id = self.camera_frame
+
         marker_array = MarkerArray()
         
         # Delete all previous markers
@@ -544,7 +396,7 @@ class PointCloudToSpheres:
         self.marker_pub.publish(marker_array)
         rospy.logdebug_throttle(1.0, 'Published %d markers.', len(spheres))
 
-    def process_pointcloud(self, event=None):  # ROS1 Timer callback requires the event arg
+    def process_pointcloud(self, event=None):
         # Generate point cloud from depth
         points, colors = self.generate_pointcloud()
         if points is None:
@@ -560,25 +412,22 @@ class PointCloudToSpheres:
             self.publish_pointcloud(points, colors)
 
         # 1) Voxel downsample
+        pcd = None
         if self.use_open3d_voxel:
-            if o3d is None:
-                rospy.logwarn_throttle(5.0, 'open3d is not available; falling back to numpy voxel downsample.')
-                points, colors = self.voxel_downsample(points, colors, voxel_size=self.voxel_size)
+            pcd = o3d.geometry.PointCloud()
+            pcd.points = o3d.utility.Vector3dVector(np.asarray(points))
+            if colors is not None:
+                pcd.colors = o3d.utility.Vector3dVector(np.asarray(colors))
+            pcd = pcd.voxel_down_sample(voxel_size=self.voxel_size)
+            points = np.asarray(pcd.points)
+            if colors is not None and len(pcd.colors) == len(pcd.points):
+                colors = np.asarray(pcd.colors)
             else:
-                pcd = o3d.geometry.PointCloud()
-                pcd.points = o3d.utility.Vector3dVector(np.asarray(points))
-                if colors is not None:
-                    pcd.colors = o3d.utility.Vector3dVector(np.asarray(colors))
-                pcd = pcd.voxel_down_sample(voxel_size=float(self.voxel_size))
-                points = np.asarray(pcd.points)
-                if colors is not None and len(pcd.colors) == len(pcd.points):
-                    colors = np.asarray(pcd.colors)
-                else:
-                    colors = None
+                colors = None
         else:
             points, colors = self.voxel_downsample(points, colors, voxel_size=self.voxel_size)
-
-        rospy.loginfo('Points after downsample: %d', len(points))
+        
+        rospy.loginfo(f'Points after downsample : {len(points)}')
 
         if len(points) < 50:
             rospy.logwarn_throttle(2.0, 'Too few points after downsample (%d); skipping.', len(points))
@@ -597,11 +446,11 @@ class PointCloudToSpheres:
             return
 
         sphere_data = []  # spheres in camera frame
-        new_spheres = []
         for label in unique_labels:
             cluster_points = points[labels == label]
             rospy.logdebug('Cluster %s: %d points', str(label), len(cluster_points))
-            self.fit_and_subdivide(cluster_points, sphere_data, new_spheres)
+            
+            self.fit_and_subdivide(cluster_points, sphere_data)
 
         # Transform centers into torso_lift_link (for safety_filter compatibility)
         target_frame = 'torso_lift_link'
@@ -639,7 +488,6 @@ class PointCloudToSpheres:
                     pre_r = predefined_radii[i]
                     dist = np.linalg.norm(detect_center - pre_center)
                     
-                    # overlap if dist < (r1 + r2) * 1.2
                     overlap_threshold = (pre_r + detect_r) * 1.2
                     
                     if dist < overlap_threshold:
@@ -660,20 +508,18 @@ class PointCloudToSpheres:
         # Publish filtered spheres (no NMS)
         nms_spheres = filtered_sphere_data
 
-        # Apply z-min and optional adjustments
-        nms_spheres = self._apply_filters_and_adjustments(nms_spheres, frame_id='torso_lift_link')
-
-        # Publish
-        self._publish_spheres(nms_spheres, frame_id='torso_lift_link')
+        sphere_msg = Float64MultiArray()
+        flat_data = []
+        for center_x, center_y, center_z, radius in nms_spheres:
+            flat_data.extend([center_x, center_y, center_z, radius])
+        sphere_msg.data = flat_data
+        self.sphere_pub.publish(sphere_msg)
         rospy.logdebug_throttle(1.0, 'Published %d spheres to /detected_spheres.', len(nms_spheres))
-
-        # Record offline spheres if enabled
-        if self.mode == 'record':
-            try:
-                self._save_spheres_json(nms_spheres, frame_id='torso_lift_link')
-                rospy.loginfo_throttle(2.0, '[PointCloudToSpheres] saved spheres -> %s', self.record_path)
-            except Exception as e:
-                rospy.logwarn_throttle(2.0, '[PointCloudToSpheres] save failed: %s', str(e))
+        
+        # RViz markers (torso_lift_link)
+        if len(nms_spheres) > 0:
+            sphere_markers = [((x, y, z), r) for x, y, z, r in nms_spheres]
+            self.publish_sphere_markers(sphere_markers, frame_id='torso_lift_link')
 
 def main(args=None):
     try:
