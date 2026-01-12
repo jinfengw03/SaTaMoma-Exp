@@ -58,6 +58,7 @@ class PointCloudToSpheres:
         self.record_path = rospy.get_param('~record_path', str(Path.home() / 'tiago_predefined_spheres.json'))
         self.playback_rate_hz = float(rospy.get_param('~playback_rate_hz', 10.0))
         self.z_min = float(rospy.get_param('~z_min', 0.0))
+        self.z_threshold = float(rospy.get_param('~z_threshold', 1.5))
         self.xyz_offset = rospy.get_param('~xyz_offset', [0.0, 0.0, 0.0])
         self.radius_scale = float(rospy.get_param('~radius_scale', 1.0))
         self.radius_min = float(rospy.get_param('~radius_min', 0.0))
@@ -341,7 +342,7 @@ class PointCloudToSpheres:
         z = self.depth_image
 
         # Keep valid, near-range points
-        valid = (z > 0) & (z < 0.87) & (np.isfinite(z))
+        valid = (z > 0) & (z < self.z_threshold) & (np.isfinite(z))
         
         # Debug: log stats before filtering
         rospy.loginfo_once('Depth stats: min=%.3f max=%.3f mean=%.3f valid_ratio=%.2f%%',
