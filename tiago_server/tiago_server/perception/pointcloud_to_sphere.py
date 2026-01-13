@@ -73,7 +73,9 @@ class PointCloudToSpheres:
         self.use_open3d_voxel = bool(rospy.get_param('~use_open3d_voxel', True))
         self.voxel_size = float(rospy.get_param('~voxel_size', 0.01))
 
-        # TF (ROS1)
+        # TF (ROS1) - use lenient settings for real robot disruptions/latencies
+        self.tf_timeout = float(rospy.get_param('~tf_timeout', 3.0))
+        self.use_latest_tf = bool(rospy.get_param('~use_latest_tf', True))
         self.tf_listener = tf.TransformListener()
 
         self.sphere_pub = rospy.Publisher('/detected_spheres', Float64MultiArray, queue_size=10)
@@ -104,6 +106,8 @@ class PointCloudToSpheres:
         rospy.loginfo('  - voxel_size:   %.3f', self.voxel_size)
         rospy.loginfo('  - open3d_voxel: %s', str(bool(self.use_open3d_voxel)))
         rospy.loginfo('  - mode:         %s', self.mode)
+        rospy.loginfo('  - tf_timeout:   %.1fs', self.tf_timeout)
+        rospy.loginfo('  - use_latest_tf: %s', str(self.use_latest_tf))
         rospy.loginfo('RViz topics:')
         rospy.loginfo('  - markers: /sphere_markers (MarkerArray)')
         rospy.loginfo('  - cloud:   /camera_pointcloud (PointCloud2)')
@@ -285,8 +289,11 @@ class PointCloudToSpheres:
         """Transform a 3D point from camera frame into target_frame."""
         point_stamped = PointStamped()
         point_stamped.header.frame_id = self.camera_frame
-        # Use cloud stamp for TF consistency
-        stamp = self.last_cloud_time if self.last_cloud_time else rospy.Time(0)
+        # Use latest transform if enabled, otherwise use exact timestamp
+        if self.use_latest_tf:
+            stamp = rospy.Time(0)  # Latest available transform
+        else:
+            stamp = self.last_cloud_time if self.last_cloud_time else rospy.Time(0)
         point_stamped.header.stamp = stamp
         point_stamped.point.x = center[0]
         point_stamped.point.y = center[1]
@@ -294,7 +301,7 @@ class PointCloudToSpheres:
         try:
             self.tf_listener.waitForTransform(
                 target_frame, self.camera_frame,
-                stamp, rospy.Duration(1.0)
+                stamp, rospy.Duration(self.tf_timeout)
             )
             transformed_point = self.tf_listener.transformPoint(target_frame, point_stamped)
             rospy.logdebug('TF: %s -> [%.3f %.3f %.3f] (%s)',
@@ -303,7 +310,7 @@ class PointCloudToSpheres:
                           target_frame)
             return [transformed_point.point.x, transformed_point.point.y, transformed_point.point.z]
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException) as e:
-            rospy.logwarn('TF transform failed: %s', str(e))
+            rospy.logwarn_throttle(2.0, 'TF transform failed (%s->%s): %s', self.camera_frame, target_frame, str(e))
             return None
 
     def fit_sphere(self, points):
@@ -357,8 +364,8 @@ class PointCloudToSpheres:
                 self.fit_and_subdivide(sub_cluster_points, sphere_data, new_spheres, depth + 1, max_depth, num_sub_clusters + 1)
 
     def get_predefined_spheres(self, stamp=None):
-        if stamp is None:
-            stamp = rospy.Time(0)
+        # Always use latest transform for arm links (they move continuously)
+        stamp = rospy.Time(0)
             
         positions = []
         radii = []
@@ -373,7 +380,7 @@ class PointCloudToSpheres:
                 pt.point.x, pt.point.y, pt.point.z = offset
                 try:
                     self.tf_listener.waitForTransform(
-                        target_frame, link_name, pt.header.stamp, rospy.Duration(0.1)
+                        target_frame, link_name, pt.header.stamp, rospy.Duration(self.tf_timeout)
                     )
                     pt_transformed = self.tf_listener.transformPoint(target_frame, pt)
                     pos = [pt_transformed.point.x, pt_transformed.point.y, pt_transformed.point.z]
@@ -381,6 +388,7 @@ class PointCloudToSpheres:
                     radii.append(self.sphere_radii[radius_idx])
                     radius_idx += 1
                 except Exception as e:
+                    rospy.logwarn_throttle(5.0, 'Failed to transform arm sphere %s: %s', link_name, str(e))
                     radius_idx += 1
         
         rospy.logdebug('Predefined arm spheres: %d/%d transformed into %s.',
