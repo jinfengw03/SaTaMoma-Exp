@@ -1,6 +1,14 @@
+#!/bin/bash
+# 1. Activate base conda to use 'conda' commands
 source /home/jiachenli/miniconda3/bin/activate
+
+# 2. Reset and activate the robot-specific environment
 conda deactivate
 source /opt/ros/noetic/setup.bash
 conda activate ros39
+
+# 3. Set existing robot teleop variables
 export TIAGO_TELEOP_TYPE=KEYBOARD
+
+# 4. Run the robot client
 python tiago_client/run_tiago_real.py
