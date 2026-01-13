@@ -11,7 +11,7 @@ def main():
     
     # Initialize Intent Predictor
     # Note: Ensure 'ollama' is installed and 'llava:7b' model is pulled
-    predictor = IntentPredictorIntegrated(model_name='llava:7b', analysis_interval=5.0)
+    predictor = IntentPredictorIntegrated(model_name='gpt-4o', analysis_interval=5.0)
     
     # Print banner as single string to avoid terminal corruption from keyboard thread
     banner = (
