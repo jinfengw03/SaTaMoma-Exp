@@ -56,7 +56,7 @@ class PointCloudToSpheres:
         self.mode = rospy.get_param('~mode', 'live').strip().lower()
         self.record_path = rospy.get_param('~record_path', str(Path.home() / 'tiago_predefined_spheres.json'))
         self.playback_rate_hz = float(rospy.get_param('~playback_rate_hz', 10.0))
-        self.z_min = float(rospy.get_param('~z_min', 0.0))
+        self.z_min = float(rospy.get_param('~z_min', -1.5))
         self.z_threshold = float(rospy.get_param('~z_threshold', 1.5))
         self.xyz_offset = rospy.get_param('~xyz_offset', [0.0, 0.0, 0.0])
         self.radius_scale = float(rospy.get_param('~radius_scale', 1.0))
@@ -71,7 +71,7 @@ class PointCloudToSpheres:
 
         # Open3D voxel downsample
         self.use_open3d_voxel = bool(rospy.get_param('~use_open3d_voxel', True))
-        self.voxel_size = float(rospy.get_param('~voxel_size', 0.01))
+        self.voxel_size = float(rospy.get_param('~voxel_size', 0.02))
 
         # TF (ROS1) - use lenient settings for real robot disruptions/latencies
         self.tf_timeout = float(rospy.get_param('~tf_timeout', 3.0))
@@ -266,7 +266,7 @@ class PointCloudToSpheres:
             for point in pc2.read_points(msg, field_names=("x", "y", "z"), skip_nans=True):
                 x, y, z = point
                 # Filter by distance threshold
-                if 0 < z < self.z_threshold and np.isfinite(x) and np.isfinite(y):
+                if self.z_min < z < self.z_threshold and np.isfinite(x) and np.isfinite(y):
                     points_list.append([x, y, z])
             
             if len(points_list) > 0:
