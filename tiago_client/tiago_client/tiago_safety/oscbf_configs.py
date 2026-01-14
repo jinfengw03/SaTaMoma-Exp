@@ -165,24 +165,25 @@ class OSCBFVelocityConfig(CBFConfig):
         # Store the diagonal of W.T @ W for the task and joint space weighting matrices
         # This assumes that W is a diagonal matrix with only positive values
         self.W_T_W_task_diag = tuple(
-            np.array([self.pos_obj_weight] * 3 + [self.rot_obj_weight] * 3) ** 2
+            np.array([self.pos_obj_weight] * 3 + [self.rot_obj_weight] * 3, dtype=np.float32) ** 2
         )
         self.W_T_W_joint_diag = tuple(
-            np.array([self.joint_space_obj_weight] * self.num_joints) ** 2
+            np.array([self.joint_space_obj_weight] * self.num_joints, dtype=np.float32) ** 2
         )
 
         super().__init__(
             n=self.num_joints,
             m=self.num_joints,
-            u_min=-np.asarray(robot.joint_max_velocities),
-            u_max=np.asarray(robot.joint_max_velocities),
+            u_min=-np.asarray(robot.joint_max_velocities, dtype=np.float32),
+            u_max=np.asarray(robot.joint_max_velocities, dtype=np.float32),
+            init_args=(),
         )
 
     def f(self, z, **kwargs):
-        return jnp.zeros(self.n)
+        return jnp.zeros(self.n, dtype=jnp.float32)
 
     def g(self, z, **kwargs):
-        return jnp.eye(self.num_joints)
+        return jnp.eye(self.num_joints, dtype=jnp.float32)
 
     def _P(self, z):
         q = z

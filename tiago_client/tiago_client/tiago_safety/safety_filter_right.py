@@ -1,5 +1,11 @@
 import numpy as np
 import jax.numpy as jnp
+import warnings
+
+# Filter harmless warnings from cbfpy about Lgh testing and JAX/XLA compilation
+warnings.filterwarnings("ignore", message=".*Cannot test Lgh.*")
+warnings.filterwarnings("ignore", message=".*ptx89.*")
+
 from tiago_client.tiago_safety.manipulator import Manipulator
 from .oscbf_configs import OSCBFVelocityConfig
 from cbfpy import CBF
@@ -13,9 +19,10 @@ class CollisionsVelocityConfig(OSCBFVelocityConfig):
         plane_z_min: float = 0.0,
         plane_enabled: bool = True,
     ):
-        self.collision_positions = jnp.atleast_2d(collision_positions)
-        self.collision_radii = jnp.ravel(collision_radii)
-        self.plane_z_min = float(plane_z_min)
+        # Ensure all arrays are float32 for JAX compatibility
+        self.collision_positions = jnp.atleast_2d(jnp.array(collision_positions, dtype=jnp.float32))
+        self.collision_radii = jnp.ravel(jnp.array(collision_radii, dtype=jnp.float32))
+        self.plane_z_min = jnp.float32(plane_z_min)
         self.plane_enabled = bool(plane_enabled)
         super(CollisionsVelocityConfig, self).__init__(robot)
 
@@ -84,6 +91,8 @@ class JointSafetyFilter:
         )
         
         self.cbf = None
+        self.collision_positions = np.array([], dtype=np.float32)
+        self.collision_radii = np.array([], dtype=np.float32)
         self.last_velocity = np.zeros(7)
         self.max_acceleration = 2.0
         self.motion_blocked = False
@@ -117,13 +126,18 @@ class JointSafetyFilter:
         :param obstacles: List of [x, y, z, r] in torso_lift_link frame
         """
         self._last_obstacles = obstacles if obstacles is not None else []
-        obs_array = np.array(obstacles) if obstacles else np.array([])
+        obs_array = np.array(obstacles, dtype=np.float32) if obstacles is not None and len(obstacles) > 0 else np.array([], dtype=np.float32)
+        
+        # Store collision data for later use (ensure float32 for JAX compatibility)
+        self.collision_positions = obs_array[:, :3] if obs_array.size else np.array([], dtype=np.float32)
+        self.collision_radii = obs_array[:, 3] if obs_array.size else np.array([], dtype=np.float32)
+        
         # Always build a CBF when plane constraint is enabled, even if there are no obstacle spheres.
         self.cbf = CBF.from_config(
             CollisionsVelocityConfig(
                 robot=self.robot,
-                collision_positions=obs_array[:, :3] if obs_array.size else np.array([]),
-                collision_radii=obs_array[:, 3] if obs_array.size else np.array([]),
+                collision_positions=self.collision_positions,
+                collision_radii=self.collision_radii,
                 plane_z_min=self.table_height,
                 plane_enabled=self.plane_enabled,
             )
@@ -144,8 +158,8 @@ class JointSafetyFilter:
                 robot_collision_positions = robot_collision_pos_rad[:, :3]
                 robot_collision_radii = robot_collision_pos_rad[:, 3]
 
-                obs_positions = np.array(self.cbf.config.collision_positions)
-                obs_radii = np.array(self.cbf.config.collision_radii)
+                obs_positions = self.collision_positions
+                obs_radii = self.collision_radii
 
                 safe_from_spheres = True
                 if obs_positions.size > 0:
@@ -181,8 +195,8 @@ class JointSafetyFilter:
         robot_collision_positions = robot_collision_pos_rad[:, :3]
         robot_collision_radii = robot_collision_pos_rad[:, 3]
         
-        obs_positions = np.array(self.cbf.config.collision_positions)
-        obs_radii = np.array(self.cbf.config.collision_radii)
+        obs_positions = self.collision_positions
+        obs_radii = self.collision_radii
         
         cbf_enabled = False
 
@@ -212,7 +226,8 @@ class JointSafetyFilter:
 
         if cbf_enabled:
             u_nom = (q_target - q_curr) / dt
-            u_safe = self.cbf.safety_filter(q_curr, u_nom)
+            # Convert to float32 for JAX compatibility
+            u_safe = self.cbf.safety_filter(q_curr.astype(np.float32), u_nom.astype(np.float32))
         else:
             u_safe = (q_target - q_curr) / dt
         
