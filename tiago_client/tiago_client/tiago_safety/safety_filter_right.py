@@ -89,9 +89,16 @@ class JointSafetyFilter:
         self.motion_blocked = False
         self.threshold = 0.87
 
+        # Auto-unlock when safely away from obstacles/plane (hysteresis)
+        # If motion_blocked is triggered (penetration), we will automatically release
+        # once all safety margins are comfortably positive again.
+        self.auto_unlock_enabled = True
+        self.unlock_sphere_margin = 0.05  # meters
+        self.unlock_plane_margin = 0.03   # meters
+
         # Plane safety constraint (torso_lift_link frame)
         # Keep robot collision spheres above z >= table_height
-        self.plane_enabled = True
+        self.plane_enabled = False
         self.table_height = 0.0
         self.plane_threshold = 0.05  # start CBF when within 5cm of plane
 
@@ -130,6 +137,39 @@ class JointSafetyFilter:
         :param dt: Time step
         :return: q_safe
         """
+        # If previously blocked, allow auto-unlock once we're safely away again.
+        if self.motion_blocked and self.auto_unlock_enabled and self.cbf is not None:
+            try:
+                robot_collision_pos_rad = self.robot.link_collision_data(q_curr)
+                robot_collision_positions = robot_collision_pos_rad[:, :3]
+                robot_collision_radii = robot_collision_pos_rad[:, 3]
+
+                obs_positions = np.array(self.cbf.config.collision_positions)
+                obs_radii = np.array(self.cbf.config.collision_radii)
+
+                safe_from_spheres = True
+                if obs_positions.size > 0:
+                    center_deltas = (
+                        robot_collision_positions[:, None, :] - obs_positions[None, :, :]
+                    ).reshape(-1, 3)
+                    radii_sums = (
+                        robot_collision_radii[:, None] + obs_radii[None, :]
+                    ).reshape(-1)
+                    h_collision = np.linalg.norm(center_deltas, axis=1) - radii_sums
+                    safe_from_spheres = bool(np.all(h_collision > float(self.unlock_sphere_margin)))
+
+                safe_from_plane = True
+                if self.plane_enabled:
+                    h_plane = (robot_collision_positions[:, 2] - robot_collision_radii) - float(self.table_height)
+                    safe_from_plane = bool(np.all(h_plane > float(self.unlock_plane_margin)))
+
+                if safe_from_spheres and safe_from_plane:
+                    self.motion_blocked = False
+                    self.last_velocity = np.zeros_like(self.last_velocity)
+            except Exception:
+                # If anything goes wrong, keep blocked for safety.
+                pass
+
         if self.motion_blocked:
             return q_curr
 
