@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 import rospy
 from sensor_msgs.msg import Image, CameraInfo, PointCloud2, PointField
+import sensor_msgs.point_cloud2 as pc2
 from std_msgs.msg import Header
 from cv_bridge import CvBridge
 from std_msgs.msg import Float64MultiArray
@@ -47,17 +48,15 @@ class PointCloudToSpheres:
     def __init__(self):
         rospy.init_node('pointcloud_to_spheres')
         self.bridge = CvBridge()
-        self.camera_info = None
-        self.rgb_image = None
-        self.depth_image = None
-        self.last_depth_time = None
+        self.pointcloud_data = None
+        self.last_cloud_time = None
 
         # --- Offline / predefined environment mode ---
         # mode: live | record | playback
         self.mode = rospy.get_param('~mode', 'live').strip().lower()
         self.record_path = rospy.get_param('~record_path', str(Path.home() / 'tiago_predefined_spheres.json'))
         self.playback_rate_hz = float(rospy.get_param('~playback_rate_hz', 10.0))
-        self.z_min = float(rospy.get_param('~z_min', 0.0))
+        self.z_min = float(rospy.get_param('~z_min', -1.5))
         self.z_threshold = float(rospy.get_param('~z_threshold', 1.5))
         self.xyz_offset = rospy.get_param('~xyz_offset', [0.0, 0.0, 0.0])
         self.radius_scale = float(rospy.get_param('~radius_scale', 1.0))
@@ -67,26 +66,16 @@ class PointCloudToSpheres:
         self._playback_mtime = None
 
         # Topics / frames (private params)
-        # Defaults match the xtion topics used in the existing setup.
-        # NOTE: If using /xtion/depth/image_raw, you MUST also set:
-        #   camera_info_topic to /xtion/depth/camera_info
-        #   camera_frame to xtion_depth_optical_frame
-        self.rgb_image_topic = rospy.get_param('~rgb_image_topic', '/xtion/rgb/image_raw')
-        self.depth_image_topic = rospy.get_param('~depth_image_topic', '/xtion/depth/image_raw')
-        self.camera_info_topic = rospy.get_param('~camera_info_topic', '/xtion/depth/camera_info')
+        self.pointcloud_topic = rospy.get_param('~pointcloud_topic', '/xtion/depth/points')
         self.camera_frame = rospy.get_param('~camera_frame', 'xtion_depth_optical_frame')
 
         # Open3D voxel downsample
         self.use_open3d_voxel = bool(rospy.get_param('~use_open3d_voxel', True))
         self.voxel_size = float(rospy.get_param('~voxel_size', 0.02))
 
-        # Camera projection convention controls
-        # By default, follow ROS optical frame: x right, y down, z forward.
-        # If your TF tree/sensor driver uses a different convention, you can flip axes.
-        self.negate_x = bool(rospy.get_param('~negate_x', False))
-        self.negate_y = bool(rospy.get_param('~negate_y', False))
-
-        # TF (ROS1)
+        # TF (ROS1) - use lenient settings for real robot disruptions/latencies
+        self.tf_timeout = float(rospy.get_param('~tf_timeout', 3.0))
+        self.use_latest_tf = bool(rospy.get_param('~use_latest_tf', True))
         self.tf_listener = tf.TransformListener()
 
         self.sphere_pub = rospy.Publisher('/detected_spheres', Float64MultiArray, queue_size=10)
@@ -96,22 +85,10 @@ class PointCloudToSpheres:
         self.pointcloud_pub = rospy.Publisher('/camera_pointcloud', PointCloud2, queue_size=10)
 
         if self.mode != 'playback':
-            self.camera_info_sub = rospy.Subscriber(
-                self.camera_info_topic,
-                CameraInfo,
-                self.camera_info_callback,
-                queue_size=10)
-
-            self.rgb_sub = rospy.Subscriber(
-                self.rgb_image_topic,
-                Image,
-                self.rgb_callback,
-                queue_size=10)
-
-            self.depth_sub = rospy.Subscriber(
-                self.depth_image_topic,
-                Image,
-                self.depth_callback,
+            self.pointcloud_sub = rospy.Subscriber(
+                self.pointcloud_topic,
+                PointCloud2,
+                self.pointcloud_callback,
                 queue_size=10)
 
             self.timer = rospy.Timer(rospy.Duration(0.5), self.process_pointcloud)
@@ -121,9 +98,7 @@ class PointCloudToSpheres:
 
         rospy.loginfo('Subscriptions:')
         if self.mode != 'playback':
-            rospy.loginfo('  - rgb_image:    %s', self.rgb_image_topic)
-            rospy.loginfo('  - depth_image:  %s', self.depth_image_topic)
-            rospy.loginfo('  - camera_info:  %s', self.camera_info_topic)
+            rospy.loginfo('  - pointcloud:   %s', self.pointcloud_topic)
         else:
             rospy.loginfo('  - playback_file: %s', self.record_path)
             rospy.loginfo('  - playback_rate: %.2f Hz', self.playback_rate_hz)
@@ -131,6 +106,8 @@ class PointCloudToSpheres:
         rospy.loginfo('  - voxel_size:   %.3f', self.voxel_size)
         rospy.loginfo('  - open3d_voxel: %s', str(bool(self.use_open3d_voxel)))
         rospy.loginfo('  - mode:         %s', self.mode)
+        rospy.loginfo('  - tf_timeout:   %.1fs', self.tf_timeout)
+        rospy.loginfo('  - use_latest_tf: %s', str(self.use_latest_tf))
         rospy.loginfo('RViz topics:')
         rospy.loginfo('  - markers: /sphere_markers (MarkerArray)')
         rospy.loginfo('  - cloud:   /camera_pointcloud (PointCloud2)')
@@ -281,109 +258,42 @@ class PointCloudToSpheres:
             sphere_markers = [((x, y, z), r) for x, y, z, r in spheres_xyzr]
             self.publish_sphere_markers(sphere_markers, frame_id=frame_id)
 
-    def camera_info_callback(self, msg):
-        if self.camera_info is None:
-            self.camera_info = msg
-            rospy.loginfo('Received camera intrinsics: fx=%.3f fy=%.3f cx=%.3f cy=%.3f',
-                          msg.K[0], msg.K[4], msg.K[2], msg.K[5])
-            # Unsubscribe after first valid message
-            self.camera_info_sub.unregister()
-            rospy.loginfo('Unsubscribed from camera_info (latched).')
-
-    def rgb_callback(self, msg):
+    def pointcloud_callback(self, msg):
+        """Callback to receive PointCloud2 messages."""
         try:
-            self.rgb_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
-            rospy.loginfo_once('RGB image received.')
-        except Exception as e:
-            rospy.logerr('RGB conversion failed: %s', str(e))
-
-    def depth_callback(self, msg):
-        try:
-            # Log the incoming encoding to debug
-            rospy.loginfo_once('Depth image encoding: %s', msg.encoding)
+            # Extract XYZ points from PointCloud2
+            points_list = []
+            for point in pc2.read_points(msg, field_names=("x", "y", "z"), skip_nans=True):
+                x, y, z = point
+                # Filter by distance threshold
+                if self.z_min < z < self.z_threshold and np.isfinite(x) and np.isfinite(y):
+                    points_list.append([x, y, z])
             
-            # Try to handle both 16UC1 (raw depth in mm) and 32FC1 (depth in meters)
-            if msg.encoding == '16UC1':
-                # Raw depth in millimeters, convert to meters
-                depth_mm = self.bridge.imgmsg_to_cv2(msg, desired_encoding='16UC1')
-                self.depth_image = depth_mm.astype(np.float32) / 1000.0
-                rospy.loginfo_once('Converted 16UC1 depth (mm) to float32 (m)')
+            if len(points_list) > 0:
+                self.pointcloud_data = {
+                    'points': np.array(points_list),
+                    'frame_id': msg.header.frame_id,
+                    'stamp': msg.header.stamp
+                }
+                self.last_cloud_time = msg.header.stamp
+                rospy.loginfo_once('PointCloud2 received: %d valid points', len(points_list))
+                rospy.logdebug('PointCloud2: frame=%s points=%d', msg.header.frame_id, len(points_list))
             else:
-                # Already in meters (32FC1 or passthrough)
-                self.depth_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
-                if self.depth_image.dtype != np.float32:
-                    self.depth_image = self.depth_image.astype(np.float32)
-                rospy.loginfo_once('Using depth as-is: %s', str(self.depth_image.dtype))
-            
-            self.last_depth_time = msg.header.stamp
-            rospy.loginfo_once('Depth image received.')
-            rospy.logdebug('Depth stamp: %s', str(self.last_depth_time))
+                rospy.logwarn_throttle(5.0, 'No valid points in PointCloud2')
+                self.pointcloud_data = None
+                
         except Exception as e:
-            rospy.logerr('Depth conversion failed: %s', str(e))
-
-    def generate_pointcloud(self):
-        if self.camera_info is None or self.depth_image is None:
-            missing = []
-            if self.camera_info is None:
-                missing.append('camera_info')
-            if self.depth_image is None:
-                missing.append('depth_image')
-            rospy.logwarn_throttle(5.0, 'Missing %s; skipping point cloud generation.', ', '.join(missing))
-            return None, None
-
-        height, width = self.depth_image.shape
-        fx = self.camera_info.K[0]
-        fy = self.camera_info.K[4]
-        cx = self.camera_info.K[2]
-        cy = self.camera_info.K[5]
-
-        # Pixel grid
-        u, v = np.meshgrid(np.arange(width), np.arange(height))
-        z = self.depth_image
-
-        # Keep valid, near-range points
-        valid = (z > 0) & (z < self.z_threshold) & (np.isfinite(z))
-        
-        # Debug: log stats before filtering
-        rospy.loginfo_once('Depth stats: min=%.3f max=%.3f mean=%.3f valid_ratio=%.2f%%',
-                          float(np.nanmin(z)), float(np.nanmax(z)), float(np.nanmean(z)),
-                          100.0 * np.sum(valid) / z.size)
-        
-        z = z[valid]
-        # ROS optical frame convention (REP 103):
-        #   x = (u - cx) * z / fx  (right)
-        #   y = (v - cy) * z / fy  (down)
-        #   z = depth (forward)
-        x = (u[valid] - cx) * z / fx
-        y = (v[valid] - cy) * z / fy
-        if self.negate_x:
-            x = -x
-        if self.negate_y:
-            y = -y
-
-        points = np.vstack((x, y, z)).T
-        
-        if len(points) == 0:
-            rospy.logdebug_throttle(2.0, 'Valid points: 0')
-            return None, None
-
-        rospy.logdebug_throttle(2.0, 'Valid points: %d, depth range: %.2fm-%.2fm',
-                                len(points), float(z.min()), float(z.max()))
-
-        # Optional color
-        colors = None
-        if self.rgb_image is not None:
-            rgb_flat = self.rgb_image[valid] / 255.0
-            colors = rgb_flat[:, [2, 1, 0]]  # BGR -> RGB
-
-        return points, colors
+            rospy.logerr('PointCloud2 parsing failed: %s', str(e))
 
     def transform_center(self, center, target_frame='torso_lift_link'):
         """Transform a 3D point from camera frame into target_frame."""
         point_stamped = PointStamped()
         point_stamped.header.frame_id = self.camera_frame
-        # Use depth stamp for TF consistency
-        stamp = self.last_depth_time if self.last_depth_time else rospy.Time(0)
+        # Use latest transform if enabled, otherwise use exact timestamp
+        if self.use_latest_tf:
+            stamp = rospy.Time(0)  # Latest available transform
+        else:
+            stamp = self.last_cloud_time if self.last_cloud_time else rospy.Time(0)
         point_stamped.header.stamp = stamp
         point_stamped.point.x = center[0]
         point_stamped.point.y = center[1]
@@ -391,7 +301,7 @@ class PointCloudToSpheres:
         try:
             self.tf_listener.waitForTransform(
                 target_frame, self.camera_frame,
-                stamp, rospy.Duration(1.0)
+                stamp, rospy.Duration(self.tf_timeout)
             )
             transformed_point = self.tf_listener.transformPoint(target_frame, point_stamped)
             rospy.logdebug('TF: %s -> [%.3f %.3f %.3f] (%s)',
@@ -400,7 +310,7 @@ class PointCloudToSpheres:
                           target_frame)
             return [transformed_point.point.x, transformed_point.point.y, transformed_point.point.z]
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException) as e:
-            rospy.logwarn('TF transform failed: %s', str(e))
+            rospy.logwarn_throttle(2.0, 'TF transform failed (%s->%s): %s', self.camera_frame, target_frame, str(e))
             return None
 
     def fit_sphere(self, points):
@@ -454,8 +364,8 @@ class PointCloudToSpheres:
                 self.fit_and_subdivide(sub_cluster_points, sphere_data, new_spheres, depth + 1, max_depth, num_sub_clusters + 1)
 
     def get_predefined_spheres(self, stamp=None):
-        if stamp is None:
-            stamp = rospy.Time(0)
+        # Always use latest transform for arm links (they move continuously)
+        stamp = rospy.Time(0)
             
         positions = []
         radii = []
@@ -470,7 +380,7 @@ class PointCloudToSpheres:
                 pt.point.x, pt.point.y, pt.point.z = offset
                 try:
                     self.tf_listener.waitForTransform(
-                        target_frame, link_name, pt.header.stamp, rospy.Duration(0.1)
+                        target_frame, link_name, pt.header.stamp, rospy.Duration(self.tf_timeout)
                     )
                     pt_transformed = self.tf_listener.transformPoint(target_frame, pt)
                     pos = [pt_transformed.point.x, pt_transformed.point.y, pt_transformed.point.z]
@@ -478,6 +388,7 @@ class PointCloudToSpheres:
                     radii.append(self.sphere_radii[radius_idx])
                     radius_idx += 1
                 except Exception as e:
+                    rospy.logwarn_throttle(5.0, 'Failed to transform arm sphere %s: %s', link_name, str(e))
                     radius_idx += 1
         
         rospy.logdebug('Predefined arm spheres: %d/%d transformed into %s.',
@@ -579,19 +490,22 @@ class PointCloudToSpheres:
         rospy.loginfo('Published MarkerArray with %d markers to /sphere_markers', len(marker_array.markers))
 
     def process_pointcloud(self, event=None):  # ROS1 Timer callback requires the event arg
-        # Generate point cloud from depth
-        points, colors = self.generate_pointcloud()
-        if points is None:
+        # Get point cloud from subscription
+        if self.pointcloud_data is None:
+            rospy.logwarn_throttle(5.0, 'No point cloud data available yet.')
             return
-
+        
+        points = self.pointcloud_data['points'].copy()
+        colors = None  # PointCloud2 may have RGB, but we'll skip for simplicity
+        
         rospy.logdebug_throttle(1.0, 'Raw points: %d', len(points))
 
-        # Publish a thin point cloud preview
+        # Publish a thin point cloud preview for RViz
         if len(points) > 1000:
             indices = np.random.choice(len(points), 1000, replace=False)
-            self.publish_pointcloud(points[indices], colors[indices] if colors is not None else None)
+            self.publish_pointcloud(points[indices], None, frame_id=self.camera_frame)
         else:
-            self.publish_pointcloud(points, colors)
+            self.publish_pointcloud(points, None, frame_id=self.camera_frame)
 
         # 1) Voxel downsample
         if self.use_open3d_voxel:
@@ -619,7 +533,7 @@ class PointCloudToSpheres:
             return
 
         # 2) DBSCAN clustering
-        db = DBSCAN(eps=0.10, min_samples=50).fit(points)
+        db = DBSCAN(eps=0.10, min_samples=25).fit(points)
         labels = db.labels_
         unique_labels = np.unique(labels)
         unique_labels = unique_labels[unique_labels != -1]
@@ -653,7 +567,7 @@ class PointCloudToSpheres:
         rospy.logdebug('Transformed spheres: %d', len(transformed_sphere_data))
 
         # Predefined spheres at the same timestamp
-        stamp = self.last_depth_time if self.last_depth_time else rospy.Time(0)
+        stamp = self.last_cloud_time if self.last_cloud_time else rospy.Time(0)
         predefined_positions, predefined_radii = self.get_predefined_spheres(stamp)
         
         if predefined_positions.size == 0:
