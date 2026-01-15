@@ -185,14 +185,28 @@ class IntentPredictorIntegrated:
 
     def generate_context_prompt(self):
         prompt_parts = ["Analyze the robot teleoperation scene.", "Describe objects and predict intent based on visual and 3D data."]
+    
+        # Get the physical movement status
+        movement_status = self.get_movement_status()
+    
+        # Inject it into the prompt context
+        if movement_status == "APPROACHING":
+            prompt_parts.append("TELEMETRY: Gripper is physically MOVING CLOSER to an object.")
+        elif movement_status == "RETREATING":
+            prompt_parts.append("TELEMETRY: Gripper is MOVING AWAY from an object.")
         if self.last_executed_action == "APPROACH_TABLE" and (time.time() - (self.last_action_time or 0)) < 60.0:
             prompt_parts.append("CONTEXT: Robot recently approached table; likely preparing to PICK.")
+        
         if self.detected_spheres:
             self.current_patterns = self.analyze_sphere_patterns(self.detected_spheres)
             for p in self.current_patterns:
                 prompt_parts.append(f"3D Structure: {p['type']} at {p['position']}. Possible: {p['possible_objects']}")
-        prompt_parts.extend(["Provide: 1. Key objects, 2. Intent, 3. Confidence (High/Med/Low), 4. Action (e.g. Pick Chips)"])
+            
+        # Ask the VLM to confirm this in the output
+        prompt_parts.extend(["Provide: 1. Key objects (likely indoor household objects), 2. Intent, 3. Movement Status (Confirm if gripper is approaching), 4. Confidence (High/Med/Low)"])
+    
         return "\n".join(prompt_parts)
+
 
     def analysis_loop(self):
         while self.running:
@@ -220,10 +234,26 @@ class IntentPredictorIntegrated:
         self.check_and_prompt_action(response, conf_report)
 
     def check_and_prompt_action(self, response, confidence_report):
-        # Implementation remains similar to original logic
         pass
 
     def stop(self):
         self.running = False
         import shutil
         shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+
+    def get_movement_status(self):
+    """Determines if gripper is moving towards or away from the nearest object."""
+        if len(self.distance_history) < 3:
+            return "UNKNOWN"
+    
+        # Calculate average change in distance over the last few frames
+        avg_change = np.mean(list(self.distance_history))
+    
+        # Threshold: -0.001 m/s (1mm) implies movement towards
+        if avg_change < -0.002: 
+            return "APPROACHING"
+        elif avg_change > 0.002:
+            return "RETREATING"
+        else:
+            return "STATIC"
