@@ -203,7 +203,7 @@ class IntentPredictorIntegrated:
                 prompt_parts.append(f"3D Structure: {p['type']} at {p['position']}. Possible: {p['possible_objects']}")
             
         # Ask the VLM to confirm this in the output
-        prompt_parts.extend(["Provide: 1. Key objects (likely indoor household objects), 2. Intent, 3. Movement Status (Confirm if gripper is approaching), 4. Confidence (High/Med/Low)"])
+        prompt_parts.extend(["You are a mobile manipulator in an indoor household setting. Provide each of the following on new line and format outptut: 1. Key objects (likely indoor household objects),\n 2. Intent,\n 3. Movement Status (Confirm if gripper is approaching), \n 4. Confidence (High/Med/Low)."])
     
         return "\n".join(prompt_parts)
 
@@ -243,7 +243,7 @@ class IntentPredictorIntegrated:
 
 
     def get_movement_status(self):
-    """Determines if gripper is moving towards or away from the nearest object."""
+        """Determines if gripper is moving towards or away from the nearest object."""
         if len(self.distance_history) < 3:
             return "UNKNOWN"
     
