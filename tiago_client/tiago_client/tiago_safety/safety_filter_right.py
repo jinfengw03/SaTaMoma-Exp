@@ -129,6 +129,15 @@ class JointSafetyFilter:
             )
         )
 
+    def reset(self):
+        """
+        Resets the internal state of the safety filter.
+        This should be called when a new distinct command is issued (e.g., user presses a key)
+        to prevent velocity continuity ('ghosting') from previous movements.
+        """
+        self.last_velocity = np.zeros(7)
+        self.motion_blocked = False
+
     def filter(self, q_curr, q_target, dt=0.1):
         """
         Filters the target joint position using CBF.
