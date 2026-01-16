@@ -7,7 +7,8 @@ from tiago_client.tiago_client import TiagoClient
 def main():
     # Initialize the real robot client
     # Default URL is http://192.168.0.110:1234/
-    client = TiagoClient(server_url="http://192.168.0.110:1234/", use_teleop=True)
+    server_url = os.environ.get("TIAGO_SERVER_URL", "http://192.168.0.110:1234/")
+    client = TiagoClient(server_url=server_url, use_teleop=True)
     
     # Conditionally initialize Intent Predictor based on ENABLE_VLM env var
     enable_vlm = os.environ.get('ENABLE_VLM', '0') == '1'

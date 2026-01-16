@@ -8,6 +8,7 @@ import numpy as np
 import base64
 import tempfile
 import os
+import re
 from collections import deque
 from openai import OpenAI  # Added OpenAI SDK
 
@@ -65,10 +66,18 @@ class IntentPredictorIntegrated:
         # Shared Control State
         self.current_patterns = []
         self.suggested_target = None 
+        self.last_vlm_response = ""
+        self.current_confidence = {'total': 0.5}
         
         # Temporary directory
         self.temp_dir = tempfile.mkdtemp()
         print(f'[IntentPredictor] Initialized with {model_name}. Temp dir: {self.temp_dir}', end='\r\n', flush=True)
+
+        # Log file initialization
+        self.log_file = os.path.join(os.getcwd(), f"vlm_response_log_{int(time.time())}.txt")
+        print(f"[IntentPredictor] Logging VLM responses to {self.log_file}")
+        with open(self.log_file, "w") as f:
+            f.write(f"VLM Log Start: {time.ctime()}\n{'='*40}\n")
 
         # Start analysis thread
         self.analysis_thread = threading.Thread(target=self.analysis_loop)
@@ -126,6 +135,7 @@ class IntentPredictorIntegrated:
         if ee_pose is not None:
             self.ee_position = np.array(ee_pose[:3])
         self.update_ee_target_distance()
+        self.current_confidence = self.calculate_weighted_confidence()
 
     def update_ee_target_distance(self):
         if self.ee_position is None or not self.detected_spheres: return
@@ -166,11 +176,24 @@ class IntentPredictorIntegrated:
             patterns.append({'type': 'single_sphere', 'description': 'Single object', 'possible_objects': ['apple', 'ball'], 'position': [nearest[0]['x'], nearest[0]['y'], nearest[0]['z']]})
         return patterns
 
-    def calculate_weighted_confidence(self, vlm_response):
+    def calculate_weighted_confidence(self, vlm_response=None):
+        if vlm_response is not None:
+            self.last_vlm_response = vlm_response
+
         context_score = 0.5
-        resp_lower = vlm_response.lower()
-        if any(x in resp_lower for x in ['high confidence', 'very confident']): context_score = 0.9
+        resp_lower = self.last_vlm_response.lower()
+        
+        # Parse numeric confidence if available
+        match = re.search(r'confidence.*?(\d+(?:\.\d+)?)', resp_lower)
+        if match:
+             val = float(match.group(1))
+             # Handle 0-100 scale vs 0-1 scale
+             if val > 1.0: val /= 100.0
+             context_score = max(0.0, min(1.0, val))
+        # Fallback to text matching
+        elif any(x in resp_lower for x in ['high confidence', 'very confident']): context_score = 0.7
         elif any(x in resp_lower for x in ['low confidence', 'uncertain']): context_score = 0.3
+        
         if self.latest_speech and self.speech_timestamp and (time.time() - self.speech_timestamp < self.speech_timeout):
             context_score = min(1.0, context_score + 0.2)
         dist_score = np.exp(-self.current_min_distance * 2.0) if self.current_min_distance else 0.5
@@ -184,7 +207,7 @@ class IntentPredictorIntegrated:
         return filepath
 
     def generate_context_prompt(self):
-        prompt_parts = ["Analyze the robot teleoperation scene.", "Describe objects and predict intent based on visual and 3D data."]
+        prompt_parts = ["Analyze the robot teleoperation scene.", "Describe objects and predict intent based on visual and 3D data.", "Update confidence percentage based on context in each frame."]
     
         # Get the physical movement status
         movement_status = self.get_movement_status()
@@ -203,7 +226,7 @@ class IntentPredictorIntegrated:
                 prompt_parts.append(f"3D Structure: {p['type']} at {p['position']}. Possible: {p['possible_objects']}")
             
         # Ask the VLM to confirm this in the output
-        prompt_parts.extend(["You are a mobile manipulator in an indoor household setting. Provide each of the following on new line and format outptut: 1. Key objects (likely indoor household objects),\n 2. Intent,\n 3. Movement Status (Confirm if gripper is approaching), \n 4. Confidence (High/Med/Low)."])
+        prompt_parts.extend(["You are a mobile manipulator in an indoor household setting. Provide each of the following on new line and format outptut: 1. Key objects (likely indoor household objects),\n 2. Intent,\n 3. Movement Status (Confirm if gripper is approaching), \n 4. Confidence (0.0-1.0)."])
     
         return "\n".join(prompt_parts)
 
@@ -225,6 +248,17 @@ class IntentPredictorIntegrated:
         prompt = self.generate_context_prompt()
         # Call the new GPT-4o function
         response = self.query_gpt_vision(image_path, prompt)
+        
+        # Log the response
+        if hasattr(self, 'log_file'):
+            try:
+                with open(self.log_file, "a") as f:
+                    f.write(f"\n--- Timestamp: {time.time()} ---\n")
+                    f.write(f"PROMPT:\n{prompt}\n")
+                    f.write(f"RESPONSE:\n{response}\n")
+                    f.write("-" * 40 + "\n")
+            except Exception as e:
+                print(f"Error logging VLM response: {e}")
         
         try: os.remove(image_path)
         except: pass
