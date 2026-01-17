@@ -76,8 +76,8 @@ class JointSafetyFilter:
         link_5_radii = (0.07, 0.07)
         link_6_pos = ((0.09, 0.0, 0.0), (0.15, 0.0, 0.0))
         link_6_radii = (0.07, 0.07)
-        link_7_pos = ((0.0, 0.0, 0.0),)
-        link_7_radii = (0.07,)
+        link_7_pos = ((0.0, 0.0, 0.0),(0.0, 0.0, 0.25))
+        link_7_radii = (0.07,0.07)
 
         positions_list = (link_1_pos, link_2_pos, link_3_pos, link_4_pos, link_5_pos, link_6_pos, link_7_pos)
         radii_list = (link_1_radii, link_2_radii, link_3_radii, link_4_radii, link_5_radii, link_6_radii, link_7_radii)
@@ -142,6 +142,15 @@ class JointSafetyFilter:
                 plane_enabled=self.plane_enabled,
             )
         )
+
+    def reset(self):
+        """
+        Resets the internal state of the safety filter.
+        This should be called when a new distinct command is issued (e.g., user presses a key)
+        to prevent velocity continuity ('ghosting') from previous movements.
+        """
+        self.last_velocity = np.zeros(7)
+        self.motion_blocked = False
 
     def filter(self, q_curr, q_target, dt=0.1):
         """

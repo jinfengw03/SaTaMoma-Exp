@@ -245,10 +245,12 @@ class TiagoClient:
                         # if obstacles is not None:
                         #     self.safety_filters[side].update_obstacles(obstacles)
                         
-                        # joint_safe = self.safety_filters[side].filter(joints_curr, joint_goal)
+                        # Reset velocity to prevent ghosting (similar to Cartesian node logic)
+                        self.safety_filters[side].reset()
+                        joint_safe = self.safety_filters[side].filter(joints_curr, joint_goal)
                         
                         # 4. Combine with gripper (8 elements total)
-                        safe_action[side] = np.concatenate([joint_goal, [gripper_val]])
+                        safe_action[side] = np.concatenate([joint_safe, [gripper_val]])
                     else:
                         # If IK fails, stay at current joints
                         # Use \r\n for proper line breaks when terminal is in raw mode (keyboard teleop)
