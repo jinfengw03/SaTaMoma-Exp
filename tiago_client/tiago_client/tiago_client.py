@@ -242,8 +242,8 @@ class TiagoClient:
                     '''
                     if joint_goal is not None:
                         # # 3. Safety Filter
-                        # if obstacles is not None:
-                        #     self.safety_filters[side].update_obstacles(obstacles)
+                        if obstacles is not None:
+                            self.safety_filters[side].update_obstacles(obstacles)
                         
                         # Reset velocity to prevent ghosting (similar to Cartesian node logic)
                         self.safety_filters[side].reset()
