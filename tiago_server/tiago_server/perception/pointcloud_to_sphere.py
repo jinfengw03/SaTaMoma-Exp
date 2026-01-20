@@ -56,8 +56,15 @@ class PointCloudToSpheres:
         self.mode = rospy.get_param('~mode', 'live').strip().lower()
         self.record_path = rospy.get_param('~record_path', str(Path.home() / 'tiago_predefined_spheres.json'))
         self.playback_rate_hz = float(rospy.get_param('~playback_rate_hz', 10.0))
-        self.z_min = float(rospy.get_param('~z_min', -1.5))
-        self.z_threshold = float(rospy.get_param('~z_threshold', 1.5))
+        
+        # Depth filtering params (camera frame)
+        self.min_depth = float(rospy.get_param('~min_depth', 0.1))
+        self.max_depth = float(rospy.get_param('~max_depth', 1.5))
+        
+        # Workspace height filtering (base frame)
+        self.workspace_min_z = float(rospy.get_param('~workspace_min_z', 0.8))
+        self.base_frame = rospy.get_param('~base_frame', 'base_footprint')
+
         self.xyz_offset = rospy.get_param('~xyz_offset', [0.0, 0.0, 0.0])
         self.radius_scale = float(rospy.get_param('~radius_scale', 1.0))
         self.radius_min = float(rospy.get_param('~radius_min', 0.0))
@@ -168,7 +175,8 @@ class PointCloudToSpheres:
         return pts_ds, cols[unique_indices]
 
     def _apply_filters_and_adjustments(self, spheres_xyzr, frame_id='torso_lift_link'):
-        """Apply z-min filtering and simple user adjustments.
+        """Apply user adjustments.
+        (Height filtering is now done on points in base_frame, so z_min check is removed here)
 
         spheres_xyzr: list of (x, y, z, r)
         returns: filtered list of (x, y, z, r)
@@ -188,9 +196,10 @@ class PointCloudToSpheres:
             z = float(z) + dz
             r = float(r) * float(self.radius_scale)
             r = max(self.radius_min, min(self.radius_max, r))
-            # Desktop constraint / safety: keep only obstacles above z_min
-            if z < self.z_min:
-                continue
+            
+            # Note: We rely on workspace_min_z point filtering now.
+            # If explicit z filtering in target frame is needed, add it here.
+            
             out.append((x, y, z, r))
         return out
 
@@ -200,7 +209,6 @@ class PointCloudToSpheres:
         payload = {
             'frame_id': frame_id,
             'timestamp': time.time(),
-            'z_min': self.z_min,
             'xyz_offset': self.xyz_offset,
             'radius_scale': self.radius_scale,
             'radius_min': self.radius_min,
@@ -253,7 +261,6 @@ class PointCloudToSpheres:
             flat_data.extend([float(x), float(y), float(z), float(r)])
         sphere_msg.data = flat_data
         self.sphere_pub.publish(sphere_msg)
-        # RViz markers
         if len(spheres_xyzr) > 0:
             sphere_markers = [((x, y, z), r) for x, y, z, r in spheres_xyzr]
             self.publish_sphere_markers(sphere_markers, frame_id=frame_id)
@@ -261,14 +268,12 @@ class PointCloudToSpheres:
     def pointcloud_callback(self, msg):
         """Callback to receive PointCloud2 messages."""
         try:
-            # Extract XYZ points from PointCloud2
             points_list = []
             for point in pc2.read_points(msg, field_names=("x", "y", "z"), skip_nans=True):
                 x, y, z = point
-                # Filter by distance threshold
-                if self.z_min < z < self.z_threshold and np.isfinite(x) and np.isfinite(y):
+                if self.min_depth < z < self.max_depth and np.isfinite(x) and np.isfinite(y):
                     points_list.append([x, y, z])
-            
+
             if len(points_list) > 0:
                 self.pointcloud_data = {
                     'points': np.array(points_list),
@@ -281,14 +286,39 @@ class PointCloudToSpheres:
             else:
                 rospy.logwarn_throttle(5.0, 'No valid points in PointCloud2')
                 self.pointcloud_data = None
-                
+
         except Exception as e:
             rospy.logerr('PointCloud2 parsing failed: %s', str(e))
 
-    def transform_center(self, center, target_frame='torso_lift_link'):
-        """Transform a 3D point from camera frame into target_frame."""
+    def transform_points(self, points, target_frame, source_frame, stamp):
+        """Transform numpy array of points (Nx3) from source_frame to target_frame."""
+        if points is None or len(points) == 0:
+            return points
+
+        try:
+            self.tf_listener.waitForTransform(target_frame, source_frame, stamp, rospy.Duration(0.5))
+            trans, rot = self.tf_listener.lookupTransform(target_frame, source_frame, stamp)
+            mat = self.tf_listener.fromTranslationRotation(trans, rot)
+            
+            # Homogeneous coordinates
+            points_hom = np.hstack((points, np.ones((len(points), 1))))
+            
+            # Transform: P_new = mat * P_old
+            # (4x4) * (4xN) = (4xN)
+            points_new = np.dot(mat, points_hom.T).T
+            
+            return points_new[:, :3]
+        except Exception as e:
+            rospy.logwarn_throttle(2.0, '[transform_points] Failed to transform points: %s', str(e))
+            return None
+
+    def transform_center(self, center, target_frame='torso_lift_link', source_frame=None):
+        """Transform a 3D point from camera frame (or source_frame) into target_frame."""
+        if source_frame is None:
+            source_frame = self.camera_frame
+            
         point_stamped = PointStamped()
-        point_stamped.header.frame_id = self.camera_frame
+        point_stamped.header.frame_id = source_frame
         # Use latest transform if enabled, otherwise use exact timestamp
         if self.use_latest_tf:
             stamp = rospy.Time(0)  # Latest available transform
@@ -300,7 +330,7 @@ class PointCloudToSpheres:
         point_stamped.point.z = center[2]
         try:
             self.tf_listener.waitForTransform(
-                target_frame, self.camera_frame,
+                target_frame, source_frame,
                 stamp, rospy.Duration(self.tf_timeout)
             )
             transformed_point = self.tf_listener.transformPoint(target_frame, point_stamped)
@@ -310,7 +340,7 @@ class PointCloudToSpheres:
                           target_frame)
             return [transformed_point.point.x, transformed_point.point.y, transformed_point.point.z]
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException) as e:
-            rospy.logwarn_throttle(2.0, 'TF transform failed (%s->%s): %s', self.camera_frame, target_frame, str(e))
+            rospy.logwarn_throttle(2.0, 'TF transform failed (%s->%s): %s', source_frame, target_frame, str(e))
             return None
 
     def fit_sphere(self, points):
@@ -490,14 +520,13 @@ class PointCloudToSpheres:
         rospy.loginfo('Published MarkerArray with %d markers to /sphere_markers', len(marker_array.markers))
 
     def process_pointcloud(self, event=None):  # ROS1 Timer callback requires the event arg
-        # Get point cloud from subscription
         if self.pointcloud_data is None:
             rospy.logwarn_throttle(5.0, 'No point cloud data available yet.')
             return
-        
+
         points = self.pointcloud_data['points'].copy()
-        colors = None  # PointCloud2 may have RGB, but we'll skip for simplicity
-        
+        colors = None
+
         rospy.logdebug_throttle(1.0, 'Raw points: %d', len(points))
 
         # Publish a thin point cloud preview for RViz
@@ -532,6 +561,29 @@ class PointCloudToSpheres:
             rospy.logwarn_throttle(2.0, 'Too few points after downsample (%d); skipping.', len(points))
             return
 
+        # --- Base-Frame Height Filter (Workspace Restriction) ---
+        processing_frame = self.camera_frame
+        stamp = self.last_cloud_time if self.last_cloud_time else rospy.Time(0)
+
+        if self.workspace_min_z is not None:
+            transformed_points = self.transform_points(points, self.base_frame, self.camera_frame, stamp)
+
+            if transformed_points is not None:
+                mask = transformed_points[:, 2] > self.workspace_min_z
+                filtered_points = transformed_points[mask]
+
+                rospy.loginfo_throttle(1.0, 'Height filter (%s > %.2f): %d -> %d points',
+                                       self.base_frame, self.workspace_min_z, len(points), len(filtered_points))
+
+                points = filtered_points
+                processing_frame = self.base_frame
+            else:
+                rospy.logwarn_throttle(2.0, 'Could not transform points to %s for height filtering.', self.base_frame)
+
+        if len(points) < 50:
+            rospy.logwarn_throttle(2.0, 'Too few points after height filter (%d); skipping.', len(points))
+            return
+
         # 2) DBSCAN clustering
         db = DBSCAN(eps=0.10, min_samples=25).fit(points)
         labels = db.labels_
@@ -544,7 +596,7 @@ class PointCloudToSpheres:
             rospy.logwarn_throttle(2.0, 'No valid DBSCAN clusters; skipping.')
             return
 
-        sphere_data = []  # spheres in camera frame
+        sphere_data = []
         new_spheres = []
         for label in unique_labels:
             cluster_points = points[labels == label]
@@ -553,43 +605,42 @@ class PointCloudToSpheres:
 
         # Transform centers into torso_lift_link (for safety_filter compatibility)
         target_frame = 'torso_lift_link'
-        rospy.logdebug('Spheres in camera frame: %d; transforming into %s...', len(sphere_data), target_frame)
-        
+        rospy.logdebug('Spheres in %s: %d; transforming into %s...', processing_frame, len(sphere_data), target_frame)
+
         transformed_sphere_data = []
-        
+
         for center_x, center_y, center_z, radius in sphere_data:
-            center_torso = self.transform_center([center_x, center_y, center_z], target_frame)
+            center_torso = self.transform_center([center_x, center_y, center_z], target_frame, source_frame=processing_frame)
             if center_torso is not None:
                 transformed_sphere_data.append((center_torso[0], center_torso[1], center_torso[2], radius))
             else:
                 rospy.logdebug('Skipping sphere: TF transform failed.')
-        
+
         rospy.logdebug('Transformed spheres: %d', len(transformed_sphere_data))
 
         # Predefined spheres at the same timestamp
         stamp = self.last_cloud_time if self.last_cloud_time else rospy.Time(0)
         predefined_positions, predefined_radii = self.get_predefined_spheres(stamp)
-        
+
         if predefined_positions.size == 0:
             rospy.logwarn_throttle(2.0, 'No predefined arm spheres available; filtering disabled.')
 
         # Filter detections overlapping the predefined arm spheres
         filtered_sphere_data = []
         num_filtered = 0
-        
+
         for detect_x, detect_y, detect_z, detect_r in transformed_sphere_data:
             is_overlapping = False
             detect_center = np.array([detect_x, detect_y, detect_z])
-            
+
             if predefined_positions.size > 0:
                 for i in range(len(predefined_positions)):
                     pre_center = predefined_positions[i]
                     pre_r = predefined_radii[i]
                     dist = np.linalg.norm(detect_center - pre_center)
-                    
-                    # overlap if dist < (r1 + r2) * 1.2
+
                     overlap_threshold = (pre_r + detect_r) * 1.2
-                    
+
                     if dist < overlap_threshold:
                         is_overlapping = True
                         rospy.logdebug('Filtered overlap: det=%s r=%.3f vs arm=%s r=%.3f (d=%.3f < %.3f)',
@@ -598,10 +649,10 @@ class PointCloudToSpheres:
                                       float(dist), float(overlap_threshold))
                         num_filtered += 1
                         break
-                        
+
             if not is_overlapping:
                 filtered_sphere_data.append((detect_x, detect_y, detect_z, detect_r))
-        
+
         rospy.loginfo_throttle(1.0, 'Spheres: camera=%d torso=%d filtered=%d published=%d',
                        len(sphere_data), len(transformed_sphere_data), num_filtered, len(filtered_sphere_data))
 
