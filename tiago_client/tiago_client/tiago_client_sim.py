@@ -8,6 +8,7 @@ from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from geometry_msgs.msg import Twist
 from tiago_client.oculus_teleop.teleop_policy import TeleopPolicy
 from tiago_client.oculus_teleop.teleop_core import TeleopObservation
+from tiago_client.oculus_teleop.goal_step_assist import GoalStepAssist, GoalStepAssistConfig
 from tiago_client.utils.ik_solver import TiagoIK
 from tiago_client.tiago_safety.safety_filter_right import JointSafetyFilter
 from tiago_client.utils.transformations import quat_to_euler, euler_to_quat, add_angles
@@ -60,6 +61,16 @@ class TiagoClientSim:
                 'right': JointSafetyFilter(urdf_right_arm_path, side='right'),
                 'left': JointSafetyFilter(urdf_left_arm_path, side='left')
             }
+
+            self.goal_step_assist = GoalStepAssist(GoalStepAssistConfig())
+            self._goal_step_manual_active_last = False
+            self._goal_step_last_manual_joint_target = None
+            self._goal_step_last_manual_gripper = 0.0
+        else:
+            self.goal_step_assist = GoalStepAssist(GoalStepAssistConfig())
+            self._goal_step_manual_active_last = False
+            self._goal_step_last_manual_joint_target = None
+            self._goal_step_last_manual_gripper = 0.0
             
         print("[TiagoClientSim] Initialized and connected to ROS topics.")
 
@@ -148,12 +159,17 @@ class TiagoClientSim:
 
         return self.get_state_wo_vis(), {}
 
-    def get_teleop_action(self, is_filter=False, obstacles=None):
+    def get_teleop_action(self, is_filter=False, obstacles=None, goal_step_target=None, goal_step_enabled=None):
         """
         Same logic as TiagoClient but uses local ROS state.
         """
         if self.teleop is None:
             return None, {}
+
+        if goal_step_enabled is not None:
+            self.goal_step_assist.config.enabled = bool(goal_step_enabled)
+        if goal_step_target is not None:
+            self.goal_step_assist.set_goal_xyz(goal_step_target)
             
         state = self.get_state_wo_vis()
         
@@ -193,8 +209,73 @@ class TiagoClientSim:
                         
                         joint_safe = self.safety_filters[side].filter(joints_curr, joint_goal)
                         safe_action[side] = np.concatenate([joint_safe, [gripper_val]])
+
+                        if (
+                            side == 'right'
+                            and self.goal_step_assist.config.enabled
+                            and self.goal_step_assist.goal_xyz is not None
+                        ):
+                            manual_active = float(np.linalg.norm(np.asarray(cartesian_delta, dtype=float))) > 1e-3
+                            if manual_active:
+                                self._goal_step_last_manual_joint_target = np.asarray(joint_safe, dtype=float).copy()
+                                self._goal_step_last_manual_gripper = float(gripper_val)
+                            if (
+                                self._goal_step_manual_active_last
+                                and (not manual_active)
+                                and (self._goal_step_last_manual_joint_target is not None)
+                            ):
+                                self.goal_step_assist.notify_manual_arm_command(
+                                    self._goal_step_last_manual_joint_target,
+                                    self._goal_step_last_manual_gripper,
+                                )
+                            self._goal_step_manual_active_last = manual_active
                     else:
                         safe_action[side] = np.concatenate([joints_curr, [gripper_val]])
+
+                        if (
+                            side == 'right'
+                            and self.goal_step_assist.config.enabled
+                            and self.goal_step_assist.goal_xyz is not None
+                        ):
+                            manual_active = float(np.linalg.norm(np.asarray(cartesian_delta, dtype=float))) > 1e-3
+                            if manual_active:
+                                self._goal_step_last_manual_joint_target = np.asarray(joints_curr, dtype=float).copy()
+                                self._goal_step_last_manual_gripper = float(gripper_val)
+                            if (
+                                self._goal_step_manual_active_last
+                                and (not manual_active)
+                                and (self._goal_step_last_manual_joint_target is not None)
+                            ):
+                                self.goal_step_assist.notify_manual_arm_command(
+                                    self._goal_step_last_manual_joint_target,
+                                    self._goal_step_last_manual_gripper,
+                                )
+                            self._goal_step_manual_active_last = manual_active
+
+        if (
+            self.goal_step_assist.config.enabled
+            and (self.goal_step_assist.goal_xyz is not None)
+            and (not self._goal_step_manual_active_last)
+        ):
+            right_pose = state.get('right')
+            right_joints = state.get('right_joints')
+            if right_pose is not None and right_joints is not None and len(right_pose) >= 7:
+                step = self.goal_step_assist.maybe_compute_goal_step(
+                    current_joints=right_joints,
+                    current_pos=right_pose[:3],
+                    current_quat=right_pose[3:7],
+                )
+                if step is not None:
+                    target_pos, target_quat, gripper_val = step
+                    joint_goal = self.ik_solvers['right'].find_ik(target_pos, target_quat, right_joints)
+                    if joint_goal is not None:
+                        if obstacles is not None:
+                            self.safety_filters['right'].update_obstacles(obstacles)
+                        self.safety_filters['right'].reset()
+                        joint_safe = self.safety_filters['right'].filter(right_joints, joint_goal)
+                        safe_action['right'] = np.concatenate([joint_safe, [gripper_val]])
+                    else:
+                        safe_action['right'] = np.concatenate([np.asarray(right_joints, dtype=float), [gripper_val]])
         
         if 'base' in raw_action:
             safe_action['base'] = raw_action['base']

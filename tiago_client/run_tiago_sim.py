@@ -3,6 +3,7 @@ import time
 import numpy as np
 from std_msgs.msg import Float64MultiArray
 from tiago_client.tiago_client_sim import TiagoClientSim
+import os
 
 class ObstacleMonitor:
     def __init__(self):
@@ -21,6 +22,17 @@ class ObstacleMonitor:
 def main():
     # Initialize the simulation client (connects to Gazebo via ROS)
     client = TiagoClientSim(use_teleop=True)
+
+    rviz_goal = None
+    if os.environ.get("GOAL_STEP_FROM_RVIZ", "0") == "1":
+        try:
+            from tiago_client.utils.rviz_goal_listener import RvizGoalListener
+
+            rviz_goal = RvizGoalListener()
+            print("[SIM] RViz goal listener enabled (/clicked_point, /move_base_simple/goal)")
+        except Exception as exc:
+            print(f"[SIM] RViz goal listener unavailable: {exc}")
+            rviz_goal = None
     
     # Monitor obstacles from /detected_spheres
     obs_monitor = ObstacleMonitor()
@@ -37,11 +49,15 @@ def main():
 
     try:
         while not rospy.is_shutdown():
+            goal_step_target = rviz_goal.get_goal_xyz().tolist() if rviz_goal is not None else None
+
             # 1. Get action from Oculus VR (includes IK and Safety Filter)
             # Pass the latest obstacles to the safety filter
             action, buttons = client.get_teleop_action(
                 is_filter=True, 
-                obstacles=obs_monitor.obstacles
+                obstacles=obs_monitor.obstacles,
+                goal_step_enabled=(goal_step_target is not None),
+                goal_step_target=goal_step_target,
             )
             
             if action is not None:

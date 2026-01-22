@@ -44,6 +44,36 @@ conda activate ros39
 python tiago_client/run_tiago_real.py
 ```
 
+## Optional: "Reach-Then-Step" Goal Assistance
+
+In addition to the existing continuous "attraction" assistance, the client also supports a discrete helper:
+after you finish a manual move and the right arm reaches that commanded joint target, it will take **one extra small step** toward a fixed goal point.
+
+- Implemented in `tiago_client/tiago_client/oculus_teleop/goal_step_assist.py`
+- Wired into `TiagoClient.get_teleop_action()` and `TiagoClientSim.get_teleop_action()`
+- `goal_step_target` is a 3D point expressed in the same frame as the client's EE pose (typically `torso_lift_link` in this repo)
+
+Example usage (call-site side):
+
+```python
+safe_action, buttons = client.get_teleop_action(
+  goal_step_enabled=True,
+  goal_step_target=[0.68, -0.221, 1.06],
+)
+```
+
+### Using RViz to set the goal (debug-friendly)
+
+You can set `goal_step_target` by clicking a point/goal in RViz, and letting the client TF-transform it into `torso_lift_link`:
+
+- Set env var: `GOAL_STEP_FROM_RVIZ=1`
+- RViz tools:
+  - "Publish Point" publishes `geometry_msgs/PointStamped` on `/clicked_point`
+  - "2D Nav Goal" publishes `geometry_msgs/PoseStamped` on `/move_base_simple/goal`
+- The helper subscribes to both topics and stores the latest goal transformed into `torso_lift_link`.
+
+Implementation: `tiago_client/tiago_client/utils/rviz_goal_listener.py`
+
 ## Architecture
 
 - **`intent_predictor_integrated.py`**: The brain. Runs the VLM loop, analyzes geometry, and calculates confidence.

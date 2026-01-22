@@ -5,6 +5,7 @@ from collections import OrderedDict
 from tiago_client.utils.flask_comm import decode4json, encode2json, reconstruct_space_dict
 from tiago_client.oculus_teleop.teleop_policy import TeleopPolicy
 from tiago_client.oculus_teleop.teleop_core import TeleopObservation
+from tiago_client.oculus_teleop.goal_step_assist import GoalStepAssist, GoalStepAssistConfig
 from tiago_client.utils.ik_solver import TiagoIK
 from tiago_client.tiago_safety.safety_filter_right import JointSafetyFilter
 from tiago_client.utils.transformations import quat_to_euler, euler_to_quat, add_angles
@@ -33,6 +34,7 @@ class TiagoClient:
             # Check if we want VR or Keyboard (Hybrid)
             # You can control this via an env var or argument, for now defaulting to VR if not specified
             teleop_type = os.environ.get("TIAGO_TELEOP_TYPE", "VR") # VR or KEYBOARD
+            self.teleop_type = teleop_type
             
             if teleop_type == "KEYBOARD":
                 from tiago_client.oculus_teleop.hybrid_teleop_policy import HybridTeleopPolicy
@@ -58,8 +60,19 @@ class TiagoClient:
                 'right': JointSafetyFilter(urdf_right_arm_path, side='right'),
                 'left': JointSafetyFilter(urdf_left_arm_path, side='left')
             }
+
+            # Optional: "reach-then-step" goal assistance (client-side, ROS-agnostic)
+            self.goal_step_assist = GoalStepAssist(GoalStepAssistConfig())
+            self._goal_step_manual_active_last = False
+            self._goal_step_last_manual_joint_target = None
+            self._goal_step_last_manual_gripper = 0.0
         else:
             self._teleop_needs_start = False
+            self.teleop_type = None
+            self.goal_step_assist = GoalStepAssist(GoalStepAssistConfig())
+            self._goal_step_manual_active_last = False
+            self._goal_step_last_manual_joint_target = None
+            self._goal_step_last_manual_gripper = 0.0
         
         print("[TiagoClient] Connection established and spaces initialized.")
 
@@ -173,16 +186,23 @@ class TiagoClient:
         except Exception:
             return None
 
-    def get_teleop_action(self, is_filter=False, obstacles=None, assist_target=None):
+    def get_teleop_action(self, is_filter=False, obstacles=None, assist_target=None, goal_step_target=None, goal_step_enabled=None):
         """
         Reads the current VR controller input and calculates the robot action.
         :param is_filter: Whether to use the teleop policy's internal filter
         :param obstacles: List of [x, y, z, r] for the safety filter
         :param assist_target: Optional [x, y, z] target to attract the hand towards
+        :param goal_step_target: Optional [x, y, z] goal point (same frame as EE pose, typically torso_lift_link)
+        :param goal_step_enabled: Optional bool to enable/disable "reach-then-step" assistance
         :return: (safe_action, buttons)
         """
         if self.teleop is None:
             return None, {}
+
+        if goal_step_enabled is not None:
+            self.goal_step_assist.config.enabled = bool(goal_step_enabled)
+        if goal_step_target is not None:
+            self.goal_step_assist.set_goal_xyz(goal_step_target)
             
         # Get current robot state
         state = self.get_state_wo_vis()
@@ -246,9 +266,30 @@ class TiagoClient:
                         #     self.safety_filters[side].update_obstacles(obstacles)
                         
                         # joint_safe = self.safety_filters[side].filter(joints_curr, joint_goal)
-                        
-                        # # 4. Combine with gripper (8 elements total)
+
+                        # 4. Combine with gripper (8 elements total)
                         safe_action[side] = np.concatenate([joint_goal, [gripper_val]])
+
+                        # Track manual control end -> arm a goal step (right arm only)
+                        if (
+                            side == 'right'
+                            and self.goal_step_assist.config.enabled
+                            and self.goal_step_assist.goal_xyz is not None
+                        ):
+                            manual_active = float(np.linalg.norm(np.asarray(cartesian_delta, dtype=float))) > 1e-3
+                            if manual_active:
+                                self._goal_step_last_manual_joint_target = np.asarray(joint_goal, dtype=float).copy()
+                                self._goal_step_last_manual_gripper = float(gripper_val)
+                            if (
+                                self._goal_step_manual_active_last
+                                and (not manual_active)
+                                and (self._goal_step_last_manual_joint_target is not None)
+                            ):
+                                self.goal_step_assist.notify_manual_arm_command(
+                                    self._goal_step_last_manual_joint_target,
+                                    self._goal_step_last_manual_gripper,
+                                )
+                            self._goal_step_manual_active_last = manual_active
                     else:
                         # If IK fails, stay at current joints
                         # Use \r\n for proper line breaks when terminal is in raw mode (keyboard teleop)
@@ -259,6 +300,48 @@ class TiagoClient:
                         else:
                             print(msg)
                         safe_action[side] = np.concatenate([joints_curr, [gripper_val]])
+
+                        if (
+                            side == 'right'
+                            and self.goal_step_assist.config.enabled
+                            and self.goal_step_assist.goal_xyz is not None
+                        ):
+                            manual_active = float(np.linalg.norm(np.asarray(cartesian_delta, dtype=float))) > 1e-3
+                            if manual_active:
+                                self._goal_step_last_manual_joint_target = np.asarray(joints_curr, dtype=float).copy()
+                                self._goal_step_last_manual_gripper = float(gripper_val)
+                            if (
+                                self._goal_step_manual_active_last
+                                and (not manual_active)
+                                and (self._goal_step_last_manual_joint_target is not None)
+                            ):
+                                self.goal_step_assist.notify_manual_arm_command(
+                                    self._goal_step_last_manual_joint_target,
+                                    self._goal_step_last_manual_gripper,
+                                )
+                            self._goal_step_manual_active_last = manual_active
+
+        # Optional: inject one extra step toward a fixed goal (right arm)
+        if (
+            self.goal_step_assist.config.enabled
+            and (self.goal_step_assist.goal_xyz is not None)
+            and (not self._goal_step_manual_active_last)
+        ):
+            right_pose = state.get('right')
+            right_joints = state.get('right_joints')
+            if right_pose is not None and right_joints is not None and len(right_pose) >= 7:
+                step = self.goal_step_assist.maybe_compute_goal_step(
+                    current_joints=right_joints,
+                    current_pos=right_pose[:3],
+                    current_quat=right_pose[3:7],
+                )
+                if step is not None:
+                    target_pos, target_quat, gripper_val = step
+                    joint_goal = self.ik_solvers['right'].find_ik(target_pos, target_quat, right_joints)
+                    if joint_goal is not None:
+                        safe_action['right'] = np.concatenate([np.asarray(joint_goal, dtype=float), [gripper_val]])
+                    else:
+                        safe_action['right'] = np.concatenate([np.asarray(right_joints, dtype=float), [gripper_val]])
         
         # Process base, torso, and head (direct pass-through)
         if 'base' in raw_action:

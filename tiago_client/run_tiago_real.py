@@ -1,4 +1,5 @@
 import time
+import os
 import numpy as np
 import cv2
 from tiago_client.tiago_client import TiagoClient
@@ -7,7 +8,21 @@ from intent_prediction.intent_predictor_integrated import IntentPredictorIntegra
 def main():
     # Initialize the real robot client
     # Default URL is http://192.168.0.110:1234/
-    client = TiagoClient(server_url="http://192.168.0.110:1234/", use_teleop=True)
+    server_url = os.environ.get("TIAGO_SERVER_URL", "http://192.168.0.110:1234/")
+    client = TiagoClient(server_url=server_url, use_teleop=True)
+
+    # Optional RViz goal -> discrete goal-step assistance (client side).
+    # Enable by: GOAL_STEP_FROM_RVIZ=1
+    rviz_goal = None
+    if os.environ.get("GOAL_STEP_FROM_RVIZ", "0") == "1":
+        try:
+            from tiago_client.utils.rviz_goal_listener import RvizGoalListener
+
+            rviz_goal = RvizGoalListener()
+            print("[REAL] RViz goal listener enabled (/clicked_point, /move_base_simple/goal)")
+        except Exception as exc:
+            print(f"[REAL] RViz goal listener unavailable: {exc}")
+            rviz_goal = None
     
     # Initialize Intent Predictor
     # Note: Ensure 'ollama' is installed and 'llava:7b' model is pulled
@@ -33,11 +48,18 @@ def main():
             
             # 1. Get action from Oculus VR (includes IK and Safety Filter)
             # is_filter=True enables the teleop policy's internal smoothing
-            
+
             # Check for shared control target
             assist_target = predictor.suggested_target
+
+            goal_step_target = rviz_goal.get_goal_xyz().tolist() if rviz_goal is not None else None
             
-            action, buttons = client.get_teleop_action(is_filter=True, assist_target=assist_target)
+            action, buttons = client.get_teleop_action(
+                is_filter=True,
+                assist_target=assist_target,
+                goal_step_enabled=(goal_step_target is not None),
+                goal_step_target=goal_step_target,
+            )
             
             if action is not None:
                 # 2. Send action to the robot via HTTP POST
