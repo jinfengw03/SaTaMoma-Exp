@@ -80,6 +80,14 @@ class PointCloudToSpheres:
         self.use_open3d_voxel = bool(rospy.get_param('~use_open3d_voxel', True))
         self.voxel_size = float(rospy.get_param('~voxel_size', 0.02))
 
+        # Dominant plane removal (e.g., whiteboard) before clustering
+        # When enabled, removes the largest planar surface so it won't be fitted as spheres.
+        self.remove_dominant_plane = bool(rospy.get_param('~remove_dominant_plane', False))
+        self.plane_dist_thresh = float(rospy.get_param('~plane_dist_thresh', 0.01))
+        self.plane_ransac_iters = int(rospy.get_param('~plane_ransac_iters', 200))
+        self.plane_min_inliers = int(rospy.get_param('~plane_min_inliers', 800))
+        self.plane_min_inlier_ratio = float(rospy.get_param('~plane_min_inlier_ratio', 0.30))
+
         # TF (ROS1) - use lenient settings for real robot disruptions/latencies
         self.tf_timeout = float(rospy.get_param('~tf_timeout', 3.0))
         self.use_latest_tf = bool(rospy.get_param('~use_latest_tf', True))
@@ -112,6 +120,8 @@ class PointCloudToSpheres:
         rospy.loginfo('  - camera_frame: %s', self.camera_frame)
         rospy.loginfo('  - voxel_size:   %.3f', self.voxel_size)
         rospy.loginfo('  - open3d_voxel: %s', str(bool(self.use_open3d_voxel)))
+        rospy.loginfo('  - remove_plane: %s', str(bool(self.remove_dominant_plane)))
+        rospy.loginfo('  - plane_dist:   %.3f', self.plane_dist_thresh)
         rospy.loginfo('  - mode:         %s', self.mode)
         rospy.loginfo('  - tf_timeout:   %.1fs', self.tf_timeout)
         rospy.loginfo('  - use_latest_tf: %s', str(self.use_latest_tf))
@@ -173,6 +183,100 @@ class PointCloudToSpheres:
         if len(cols) != len(pts):
             return pts_ds, None
         return pts_ds, cols[unique_indices]
+
+    @staticmethod
+    def _ransac_dominant_plane_inliers(points, dist_thresh=0.01, iters=200):
+        """Simple RANSAC plane fit; returns boolean inlier mask or None."""
+        pts = np.asarray(points)
+        if pts.ndim != 2 or pts.shape[1] != 3 or len(pts) < 3:
+            return None
+
+        n_pts = len(pts)
+        best_inliers = 0
+        best_mask = None
+
+        # Pre-generate random indices for speed/consistency
+        for _ in range(max(1, int(iters))):
+            idx = np.random.choice(n_pts, 3, replace=False)
+            p1, p2, p3 = pts[idx]
+            v1 = p2 - p1
+            v2 = p3 - p1
+            normal = np.cross(v1, v2)
+            norm = float(np.linalg.norm(normal))
+            if not np.isfinite(norm) or norm < 1e-9:
+                continue
+            normal = normal / norm
+            d = -float(np.dot(normal, p1))
+
+            dist = np.abs(pts.dot(normal) + d)
+            mask = dist < float(dist_thresh)
+            inliers = int(np.sum(mask))
+            if inliers > best_inliers:
+                best_inliers = inliers
+                best_mask = mask
+                if best_inliers > 0.90 * n_pts:
+                    break
+
+        return best_mask
+
+    def _remove_dominant_plane(self, points):
+        """Remove dominant planar inliers (e.g. whiteboard) if enabled and confident."""
+        if not self.remove_dominant_plane:
+            return points
+        if points is None or len(points) < 100:
+            return points
+
+        pts = np.asarray(points)
+        inlier_mask = None
+
+        # Prefer Open3D's plane segmentation when available
+        if o3d is not None:
+            try:
+                pcd = o3d.geometry.PointCloud()
+                pcd.points = o3d.utility.Vector3dVector(pts)
+                _, inliers = pcd.segment_plane(
+                    distance_threshold=float(self.plane_dist_thresh),
+                    ransac_n=3,
+                    num_iterations=int(self.plane_ransac_iters),
+                )
+                if inliers is not None and len(inliers) > 0:
+                    inlier_mask = np.zeros(len(pts), dtype=bool)
+                    inlier_mask[np.asarray(inliers, dtype=int)] = True
+            except Exception as e:
+                rospy.logwarn_throttle(2.0, '[PointCloudToSpheres] Open3D plane removal failed: %s', str(e))
+                inlier_mask = None
+
+        if inlier_mask is None:
+            inlier_mask = self._ransac_dominant_plane_inliers(
+                pts,
+                dist_thresh=float(self.plane_dist_thresh),
+                iters=int(self.plane_ransac_iters),
+            )
+
+        if inlier_mask is None:
+            return points
+
+        inliers = int(np.sum(inlier_mask))
+        ratio = float(inliers) / float(len(pts))
+        if inliers < int(self.plane_min_inliers) or ratio < float(self.plane_min_inlier_ratio):
+            rospy.logdebug_throttle(
+                1.0,
+                '[PointCloudToSpheres] Plane not dominant enough; keep points (inliers=%d, ratio=%.2f).',
+                inliers,
+                ratio,
+            )
+            return points
+
+        filtered = pts[~inlier_mask]
+        rospy.loginfo_throttle(
+            1.0,
+            'Plane removed: %d/%d inliers (%.0f%%); remaining=%d',
+            inliers,
+            len(pts),
+            ratio * 100.0,
+            len(filtered),
+        )
+        return filtered
 
     def _apply_filters_and_adjustments(self, spheres_xyzr, frame_id='torso_lift_link'):
         """Apply user adjustments.
@@ -582,6 +686,12 @@ class PointCloudToSpheres:
 
         if len(points) < 50:
             rospy.logwarn_throttle(2.0, 'Too few points after height filter (%d); skipping.', len(points))
+            return
+
+        # --- Dominant plane removal (e.g., whiteboard) ---
+        points = self._remove_dominant_plane(points)
+        if points is None or len(points) < 50:
+            rospy.logwarn_throttle(2.0, 'Too few points after plane removal; skipping.')
             return
 
         # 2) DBSCAN clustering
