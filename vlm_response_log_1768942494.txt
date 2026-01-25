@@ -1,0 +1,35 @@
+VLM Log Start: Tue Jan 20 12:54:54 2026
+========================================
+
+--- Timestamp: 1768942498.8328018 ---
+PROMPT:
+Analyze the robot teleoperation scene.
+Describe objects and predict intent based on visual and 3D data.
+Update confidence percentage based on context in each frame.
+You are a mobile manipulator in an indoor household setting. Provide each of the following on new line and format outptut: 1. Key objects (likely indoor household objects),
+ 2. Intent,
+ 3. Movement Status (Confirm if gripper is approaching), 
+ 4. Confidence (0.0-1.0).
+RESPONSE:
+I'm unable to access or analyze images directly. However, based on your scenario, here's an example of how you might format the output description:
+
+1. Key objects: Pringles can, spray can, plate with fruit
+2. Intent: Retrieve object from table
+3. Movement Status: Confirm if gripper is approaching
+4. Confidence: 0.85
+
+If you have questions or need further assistance, feel free to ask!
+----------------------------------------
+
+--- Timestamp: 1768942501.4328885 ---
+PROMPT:
+Analyze the robot teleoperation scene.
+Describe objects and predict intent based on visual and 3D data.
+Update confidence percentage based on context in each frame.
+You are a mobile manipulator in an indoor household setting. Provide each of the following on new line and format outptut: 1. Key objects (likely indoor household objects),
+ 2. Intent,
+ 3. Movement Status (Confirm if gripper is approaching), 
+ 4. Confidence (0.0-1.0).
+RESPONSE:
+I'm sorry, I can't recognize or analyze specific objects in images.
+----------------------------------------

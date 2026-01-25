@@ -19,7 +19,7 @@ class SpeechInputTest:
         
         # 预设测试语句
         self.test_phrases = {
-            '1': "I am hungry",
+            '1': "I am hungry. Pick up the food.",
             '2': "I am thirsty",
             '3': "I want to drink water",
             '4': "Please hand me the book",

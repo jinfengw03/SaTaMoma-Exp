@@ -261,14 +261,16 @@ class TiagoClient:
                     Next time may comment out the safety filter for testing
                     '''
                     if joint_goal is not None:
-                        # 3. Safety Filter
-                        # if obstacles is not None:
-                        #     self.safety_filters[side].update_obstacles(obstacles)
+                        # # 3. Safety Filter
+                        if obstacles is not None:
+                            self.safety_filters[side].update_obstacles(obstacles)
                         
-                        # joint_safe = self.safety_filters[side].filter(joints_curr, joint_goal)
+                        # Reset velocity to prevent ghosting (similar to Cartesian node logic)
+                        self.safety_filters[side].reset()
+                        joint_safe = self.safety_filters[side].filter(joints_curr, joint_goal)
 
                         # 4. Combine with gripper (8 elements total)
-                        safe_action[side] = np.concatenate([joint_goal, [gripper_val]])
+                        safe_action[side] = np.concatenate([joint_safe, [gripper_val]])
 
                         # Track manual control end -> arm a goal step (right arm only)
                         if (
@@ -278,7 +280,7 @@ class TiagoClient:
                         ):
                             manual_active = float(np.linalg.norm(np.asarray(cartesian_delta, dtype=float))) > 1e-3
                             if manual_active:
-                                self._goal_step_last_manual_joint_target = np.asarray(joint_goal, dtype=float).copy()
+                                self._goal_step_last_manual_joint_target = np.asarray(joint_safe, dtype=float).copy()
                                 self._goal_step_last_manual_gripper = float(gripper_val)
                             if (
                                 self._goal_step_manual_active_last

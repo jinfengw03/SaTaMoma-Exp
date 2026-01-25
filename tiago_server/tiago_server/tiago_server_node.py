@@ -57,7 +57,7 @@ class TiagoEnv:
         try:
             self.cameras['tiago_head'] = Camera(
                 img_topic='/xtion/rgb/image_raw',
-                depth_topic='/xtion/depth_registered/image_raw'
+                depth_topic='/xtion/depth/image_raw'
             )
             print("[TiagoServer] Head camera initialized")
         except Exception as e:

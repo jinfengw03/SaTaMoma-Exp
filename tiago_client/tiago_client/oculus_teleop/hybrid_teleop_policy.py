@@ -81,12 +81,12 @@ class HybridTeleopPolicy:
                         continue
 
                     # Base (vx, vy, wz) — match VR interface shape to avoid server errors
-                    if key == 'w': self.base_cmd = [0.5, 0.0, 0.0]
-                    elif key == 's': self.base_cmd = [-0.5, 0.0, 0.0]
-                    elif key == 'a': self.base_cmd = [0.0, 0.3, 0.0]
-                    elif key == 'd': self.base_cmd = [0.0, -0.3, 0.0]
-                    elif key == 'q': self.base_cmd = [0.0, 0.0, 1.5]
-                    elif key == 'e': self.base_cmd = [0.0, 0.0, -1.5]
+                    if key == 'w': self.base_cmd = [1.0, 0.0, 0.0]
+                    elif key == 's': self.base_cmd = [-1.0, 0.0, 0.0]
+                    elif key == 'a': self.base_cmd = [0.0, 0.6, 0.0]
+                    elif key == 'd': self.base_cmd = [0.0, -0.6, 0.0]
+                    elif key == 'q': self.base_cmd = [0.0, 0.0, 2.5]
+                    elif key == 'e': self.base_cmd = [0.0, 0.0, -2.5]
                     elif key == ' ': self.base_cmd = [0.0, 0.0, 0.0]
 
                     # Torso (delta accumulation request)

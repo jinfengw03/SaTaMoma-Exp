@@ -2,13 +2,14 @@
 
 import sys
 import json
+import time
 from pathlib import Path
 import numpy as np
 import rospy
 from sensor_msgs.msg import Image, CameraInfo, PointCloud2, PointField
+import sensor_msgs.point_cloud2 as pc2
 from std_msgs.msg import Header
 from cv_bridge import CvBridge
-import cv2
 from std_msgs.msg import Float64MultiArray
 import tf
 from geometry_msgs.msg import PointStamped
@@ -17,9 +18,14 @@ from scipy.optimize import leastsq
 from visualization_msgs.msg import Marker, MarkerArray
 import struct
 
+try:
+    import open3d as o3d
+except Exception:  # pragma: no cover
+    o3d = None
+
 def sphere_nms(spheres, dist_thresh=0.02, radius_thresh=0.01):
     # spheres: [(x, y, z, r, score), ...] or [(x, y, z, r)]
-    # 如果没有score，按半径降序
+    # If no score is provided, sort by radius desc.
     if len(spheres) == 0:
         return []
     if len(spheres[0]) == 5:
@@ -42,17 +48,23 @@ class PointCloudToSpheres:
     def __init__(self):
         rospy.init_node('pointcloud_to_spheres')
         self.bridge = CvBridge()
-        self.camera_info = None
-        self.rgb_image = None
-        self.depth_image = None
-        self.last_depth_time = None
+        self.pointcloud_data = None
+        self.last_cloud_time = None
 
-        # --- Offline / Predefined Environment Mode ---
+        # --- Offline / predefined environment mode ---
         # mode: live | record | playback
         self.mode = rospy.get_param('~mode', 'live').strip().lower()
         self.record_path = rospy.get_param('~record_path', str(Path.home() / 'tiago_predefined_spheres.json'))
         self.playback_rate_hz = float(rospy.get_param('~playback_rate_hz', 10.0))
-        self.z_min = float(rospy.get_param('~z_min', 0.0))
+        
+        # Depth filtering params (camera frame)
+        self.min_depth = float(rospy.get_param('~min_depth', 0.1))
+        self.max_depth = float(rospy.get_param('~max_depth', 1.5))
+        
+        # Workspace height filtering (base frame)
+        self.workspace_min_z = float(rospy.get_param('~workspace_min_z', 0.8))
+        self.base_frame = rospy.get_param('~base_frame', 'base_footprint')
+
         self.xyz_offset = rospy.get_param('~xyz_offset', [0.0, 0.0, 0.0])
         self.radius_scale = float(rospy.get_param('~radius_scale', 1.0))
         self.radius_min = float(rospy.get_param('~radius_min', 0.0))
@@ -60,59 +72,54 @@ class PointCloudToSpheres:
         self._playback_cache = None
         self._playback_mtime = None
 
-        # Camera projection convention controls
-        # By default, follow ROS optical frame: x right, y down, z forward.
-        # If your TF tree/sensor driver uses a different convention, you can flip axes.
-        self.negate_x = bool(rospy.get_param('~negate_x', False))
-        self.negate_y = bool(rospy.get_param('~negate_y', False))
+        # Topics / frames (private params)
+        self.pointcloud_topic = rospy.get_param('~pointcloud_topic', '/xtion/depth/points')
+        self.camera_frame = rospy.get_param('~camera_frame', 'xtion_depth_optical_frame')
 
-        # TF 设置（ROS1）
+        # Open3D voxel downsample
+        self.use_open3d_voxel = bool(rospy.get_param('~use_open3d_voxel', True))
+        self.voxel_size = float(rospy.get_param('~voxel_size', 0.02))
+
+        # TF (ROS1) - use lenient settings for real robot disruptions/latencies
+        self.tf_timeout = float(rospy.get_param('~tf_timeout', 3.0))
+        self.use_latest_tf = bool(rospy.get_param('~use_latest_tf', True))
         self.tf_listener = tf.TransformListener()
 
         self.sphere_pub = rospy.Publisher('/detected_spheres', Float64MultiArray, queue_size=10)
         
-        # RViz 可视化发布器
+        # RViz publishers
         self.marker_pub = rospy.Publisher('/sphere_markers', MarkerArray, queue_size=10)
         self.pointcloud_pub = rospy.Publisher('/camera_pointcloud', PointCloud2, queue_size=10)
 
         if self.mode != 'playback':
-            # 订阅相机信息（使用 xtion 相机）
-            self.camera_info_sub = rospy.Subscriber(
-                '/xtion/rgb/camera_info',
-                CameraInfo,
-                self.camera_info_callback,
+            self.pointcloud_sub = rospy.Subscriber(
+                self.pointcloud_topic,
+                PointCloud2,
+                self.pointcloud_callback,
                 queue_size=10)
 
-            # 订阅 RGB 图像
-            self.rgb_sub = rospy.Subscriber(
-                '/xtion/rgb/image_raw',
-                Image,
-                self.rgb_callback,
-                queue_size=10)
-
-            # 订阅深度图像（使用 depth_registered）
-            self.depth_sub = rospy.Subscriber(
-                '/xtion/depth_registered/image_raw',
-                Image,
-                self.depth_callback,
-                queue_size=10)
-
-            # 定时器：每 0.5 秒生成点云和球体
             self.timer = rospy.Timer(rospy.Duration(0.5), self.process_pointcloud)
-
-            rospy.loginfo('订阅话题：/xtion/rgb/image_raw, /xtion/depth_registered/image_raw, /xtion/rgb/camera_info')
-            rospy.loginfo('等待相机数据...')
         else:
             # Playback mode: no camera subscriptions
             self.timer = rospy.Timer(rospy.Duration(1.0 / max(self.playback_rate_hz, 0.5)), self.publish_from_file)
 
-        rospy.loginfo(f'[PointCloudToSpheres] mode={self.mode} record_path={self.record_path}')
-        rospy.loginfo(f'[PointCloudToSpheres] z_min={self.z_min} xyz_offset={self.xyz_offset} radius_scale={self.radius_scale}')
-        rospy.loginfo('RViz 可视化已启用：')
-        rospy.loginfo('  - 球体中心: /sphere_markers (MarkerArray)')
-        rospy.loginfo('  - 点云: /camera_pointcloud (PointCloud2)')
+        rospy.loginfo('Subscriptions:')
+        if self.mode != 'playback':
+            rospy.loginfo('  - pointcloud:   %s', self.pointcloud_topic)
+        else:
+            rospy.loginfo('  - playback_file: %s', self.record_path)
+            rospy.loginfo('  - playback_rate: %.2f Hz', self.playback_rate_hz)
+        rospy.loginfo('  - camera_frame: %s', self.camera_frame)
+        rospy.loginfo('  - voxel_size:   %.3f', self.voxel_size)
+        rospy.loginfo('  - open3d_voxel: %s', str(bool(self.use_open3d_voxel)))
+        rospy.loginfo('  - mode:         %s', self.mode)
+        rospy.loginfo('  - tf_timeout:   %.1fs', self.tf_timeout)
+        rospy.loginfo('  - use_latest_tf: %s', str(self.use_latest_tf))
+        rospy.loginfo('RViz topics:')
+        rospy.loginfo('  - markers: /sphere_markers (MarkerArray)')
+        rospy.loginfo('  - cloud:   /camera_pointcloud (PointCloud2)')
 
-        # 预定义机械臂球体数据
+        # Predefined right-arm spheres (used to filter arm points in torso_lift_link)
         self.arm_right_link_names = [
             'arm_right_1_link',  # sphere_right_1
             'arm_right_2_link',  # sphere_right_2
@@ -141,8 +148,35 @@ class PointCloudToSpheres:
             0.07               # sphere_right_7
         ]
 
+    @staticmethod
+    def voxel_downsample(points, colors=None, voxel_size=0.02):
+        """Voxel-grid downsample; keeps one point per voxel."""
+        if points is None or len(points) == 0:
+            return points, colors
+
+        if voxel_size is None or float(voxel_size) <= 0:
+            return points, colors
+
+        pts = np.asarray(points)
+        if pts.ndim != 2 or pts.shape[1] != 3:
+            return points, colors
+
+        voxel_idx = np.floor(pts / float(voxel_size)).astype(np.int32)
+        _, unique_indices = np.unique(voxel_idx, axis=0, return_index=True)
+        unique_indices.sort()
+
+        pts_ds = pts[unique_indices]
+        if colors is None:
+            return pts_ds, None
+
+        cols = np.asarray(colors)
+        if len(cols) != len(pts):
+            return pts_ds, None
+        return pts_ds, cols[unique_indices]
+
     def _apply_filters_and_adjustments(self, spheres_xyzr, frame_id='torso_lift_link'):
-        """Apply z-min filtering and simple user adjustments.
+        """Apply user adjustments.
+        (Height filtering is now done on points in base_frame, so z_min check is removed here)
 
         spheres_xyzr: list of (x, y, z, r)
         returns: filtered list of (x, y, z, r)
@@ -162,9 +196,10 @@ class PointCloudToSpheres:
             z = float(z) + dz
             r = float(r) * float(self.radius_scale)
             r = max(self.radius_min, min(self.radius_max, r))
-            # Desktop constraint / safety: keep only obstacles above z_min
-            if z < self.z_min:
-                continue
+            
+            # Note: We rely on workspace_min_z point filtering now.
+            # If explicit z filtering in target frame is needed, add it here.
+            
             out.append((x, y, z, r))
         return out
 
@@ -174,7 +209,6 @@ class PointCloudToSpheres:
         payload = {
             'frame_id': frame_id,
             'timestamp': time.time(),
-            'z_min': self.z_min,
             'xyz_offset': self.xyz_offset,
             'radius_scale': self.radius_scale,
             'radius_min': self.radius_min,
@@ -227,115 +261,90 @@ class PointCloudToSpheres:
             flat_data.extend([float(x), float(y), float(z), float(r)])
         sphere_msg.data = flat_data
         self.sphere_pub.publish(sphere_msg)
-        # RViz markers
         if len(spheres_xyzr) > 0:
             sphere_markers = [((x, y, z), r) for x, y, z, r in spheres_xyzr]
             self.publish_sphere_markers(sphere_markers, frame_id=frame_id)
 
-    def camera_info_callback(self, msg):
-        if self.camera_info is None:
-            self.camera_info = msg
-            rospy.loginfo('已接收相机内参: fx={}, fy={}, cx={}, cy={}'.format(
-                msg.K[0], msg.K[4], msg.K[2], msg.K[5]))
-            # 取消订阅
-            self.camera_info_sub.unregister()
-            rospy.loginfo('相机内参已获取，取消 /xtion/rgb/camera_info 订阅')
-
-    def rgb_callback(self, msg):
+    def pointcloud_callback(self, msg):
+        """Callback to receive PointCloud2 messages."""
         try:
-            self.rgb_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
-            rospy.loginfo_once('RGB图像接收成功！')
-        except Exception as e:
-            rospy.logerr('RGB 图像转换错误: {}'.format(e))
+            points_list = []
+            for point in pc2.read_points(msg, field_names=("x", "y", "z"), skip_nans=True):
+                x, y, z = point
+                if self.min_depth < z < self.max_depth and np.isfinite(x) and np.isfinite(y):
+                    points_list.append([x, y, z])
 
-    def depth_callback(self, msg):
+            if len(points_list) > 0:
+                self.pointcloud_data = {
+                    'points': np.array(points_list),
+                    'frame_id': msg.header.frame_id,
+                    'stamp': msg.header.stamp
+                }
+                self.last_cloud_time = msg.header.stamp
+                rospy.loginfo_once('PointCloud2 received: %d valid points', len(points_list))
+                rospy.logdebug('PointCloud2: frame=%s points=%d', msg.header.frame_id, len(points_list))
+            else:
+                rospy.logwarn_throttle(5.0, 'No valid points in PointCloud2')
+                self.pointcloud_data = None
+
+        except Exception as e:
+            rospy.logerr('PointCloud2 parsing failed: %s', str(e))
+
+    def transform_points(self, points, target_frame, source_frame, stamp):
+        """Transform numpy array of points (Nx3) from source_frame to target_frame."""
+        if points is None or len(points) == 0:
+            return points
+
         try:
-            self.depth_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='32FC1')
-            self.last_depth_time = msg.header.stamp
-            rospy.loginfo_once('深度图像接收成功！')
-            rospy.logdebug('深度图像时间戳: {}'.format(self.last_depth_time))
+            self.tf_listener.waitForTransform(target_frame, source_frame, stamp, rospy.Duration(0.5))
+            trans, rot = self.tf_listener.lookupTransform(target_frame, source_frame, stamp)
+            mat = self.tf_listener.fromTranslationRotation(trans, rot)
+            
+            # Homogeneous coordinates
+            points_hom = np.hstack((points, np.ones((len(points), 1))))
+            
+            # Transform: P_new = mat * P_old
+            # (4x4) * (4xN) = (4xN)
+            points_new = np.dot(mat, points_hom.T).T
+            
+            return points_new[:, :3]
         except Exception as e:
-            rospy.logerr('深度图像转换错误: {}'.format(e))
+            rospy.logwarn_throttle(2.0, '[transform_points] Failed to transform points: %s', str(e))
+            return None
 
-    def generate_pointcloud(self):
-        if self.camera_info is None or self.depth_image is None:
-            missing = []
-            if self.camera_info is None:
-                missing.append('相机内参')
-            if self.depth_image is None:
-                missing.append('深度图像')
-            rospy.logwarn_throttle(5.0, '缺少: {}，跳过点云生成'.format(', '.join(missing)))
-            return None, None
-
-        height, width = self.depth_image.shape
-        fx = self.camera_info.K[0]
-        fy = self.camera_info.K[4]
-        cx = self.camera_info.K[2]
-        cy = self.camera_info.K[5]
-
-        # 创建像素网格
-        u, v = np.meshgrid(np.arange(width), np.arange(height))
-        z = self.depth_image
-
-        # 过滤无效深度，只保留距离小于 0.87m 的点（机器人工作空间范围）
-        # 参考代码使用 z < 0.87 来聚焦于近距离障碍物检测
-        valid = (z > 0) & (z < 0.87) & (np.isfinite(z))
-        z = z[valid]
-        # ROS optical frame convention (REP 103):
-        #   x = (u - cx) * z / fx  (right)
-        #   y = (v - cy) * z / fy  (down)
-        #   z = depth (forward)
-        x = (u[valid] - cx) * z / fx
-        y = (v[valid] - cy) * z / fy
-        if self.negate_x:
-            x = -x
-        if self.negate_y:
-            y = -y
-
-        points = np.vstack((x, y, z)).T
-        
-        if len(points) == 0:
-            rospy.loginfo_throttle(2.0, '有效点数: 0')
-            return None, None
-
-        rospy.loginfo_throttle(2.0, f'有效点数: {len(points)}, 深度范围: {z.min():.2f}m - {z.max():.2f}m')
-
-        # 添加颜色
-        colors = None
-        if self.rgb_image is not None:
-            rgb_flat = self.rgb_image[valid] / 255.0
-            colors = rgb_flat[:, [2, 1, 0]]  # RGB 顺序
-
-        return points, colors
-
-    def transform_center(self, center, target_frame='torso_lift_link'):
-        """
-        将球体中心从相机坐标系变换到目标坐标系
-        使用 torso_lift_link 以与 safety_filter_right.py 保持一致
-        """
+    def transform_center(self, center, target_frame='torso_lift_link', source_frame=None):
+        """Transform a 3D point from camera frame (or source_frame) into target_frame."""
+        if source_frame is None:
+            source_frame = self.camera_frame
+            
         point_stamped = PointStamped()
-        point_stamped.header.frame_id = 'xtion_rgb_optical_frame'  # 相机坐标系
-        # 使用深度图像的时间戳，保证空间一致性
-        stamp = self.last_depth_time if self.last_depth_time else rospy.Time(0)
+        point_stamped.header.frame_id = source_frame
+        # Use latest transform if enabled, otherwise use exact timestamp
+        if self.use_latest_tf:
+            stamp = rospy.Time(0)  # Latest available transform
+        else:
+            stamp = self.last_cloud_time if self.last_cloud_time else rospy.Time(0)
         point_stamped.header.stamp = stamp
         point_stamped.point.x = center[0]
         point_stamped.point.y = center[1]
         point_stamped.point.z = center[2]
         try:
-            # ROS1 TF: 变换到 torso_lift_link（与 safety_filter 一致）
             self.tf_listener.waitForTransform(
-                target_frame, 'xtion_rgb_optical_frame',
-                stamp, rospy.Duration(1.0)
+                target_frame, source_frame,
+                stamp, rospy.Duration(self.tf_timeout)
             )
             transformed_point = self.tf_listener.transformPoint(target_frame, point_stamped)
-            rospy.logdebug(f'TF 变换: {center} -> [{transformed_point.point.x:.3f}, {transformed_point.point.y:.3f}, {transformed_point.point.z:.3f}] ({target_frame})')
+            rospy.logdebug('TF: %s -> [%.3f %.3f %.3f] (%s)',
+                          str(center),
+                          transformed_point.point.x, transformed_point.point.y, transformed_point.point.z,
+                          target_frame)
             return [transformed_point.point.x, transformed_point.point.y, transformed_point.point.z]
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException) as e:
-            rospy.logwarn(f'TF 变换错误: {e}')
+            rospy.logwarn_throttle(2.0, 'TF transform failed (%s->%s): %s', source_frame, target_frame, str(e))
             return None
 
     def fit_sphere(self, points):
-        """最小二乘拟合球体：输入点云，返回中心(x, y, z)和半径r"""
+        """Least-squares sphere fit; returns (center_xyz, radius)."""
         def sphere_func(c, x, y, z):
             return np.sqrt((x - c[0])**2 + (y - c[1])**2 + (z - c[2])**2) - c[3]
 
@@ -345,90 +354,84 @@ class PointCloudToSpheres:
 
         x, y, z = points[:, 0], points[:, 1], points[:, 2]
         
-        # 增加最大迭代次数，添加完整性检查
         try:
             params, success = leastsq(sphere_func, params_init, args=(x, y, z), maxfev=5000)
-            if success not in [1, 2, 3, 4]:  # 检查收敛状态
-                rospy.logwarn(f'球体拟合未收敛，状态码: {success}')
-                # 返回一个大半径作为标记，让后续逻辑进行细分
+            if success not in [1, 2, 3, 4]:
+                rospy.logwarn('Sphere fit did not converge (status=%s).', str(success))
                 return center_init, 999.0
         except Exception as e:
-            rospy.logwarn(f'球体拟合异常: {e}')
+            rospy.logwarn('Sphere fit failed: %s', str(e))
             return center_init, 999.0
 
         radius = abs(params[3])
         
-        # 合理性检查：半径不应超过点云范围的2倍
         max_extent = np.max(np.linalg.norm(points - params[:3], axis=1))
-        if radius > max_extent * 2.0 or radius > 1.0:  # 半径不应超过1米
-            rospy.logdebug(f'拟合半径不合理 (r={radius:.3f}m, extent={max_extent:.3f}m)，返回包围球')
-            # 使用包围球半径
+        if radius > max_extent * 2.0 or radius > 1.0:
+            rospy.logdebug('Unreasonable radius (r=%.3fm, extent=%.3fm); using bounding radius.', float(radius), float(max_extent))
             radius = max_extent
         
         return params[:3], radius
 
     def fit_and_subdivide(self, cluster_points, sphere_data, new_spheres, depth=0, max_depth=5, num_sub_clusters=3):
         if depth > max_depth:
-            rospy.logdebug('达到最大递归深度，停止细分')
+            rospy.logdebug('Reached max recursion depth; stop subdividing.')
             return
-        if len(cluster_points) < 10:  # 参考代码使用 10 个点作为最小要求
+        if len(cluster_points) < 10:
             return
         center, radius = self.fit_sphere(cluster_points)
         
-        # 参考代码使用 0.05m 作为球体半径阈值
         if radius < 0.05:
             sphere_data.append((center[0], center[1], center[2], radius))
-            rospy.loginfo(f'添加球体: 中心 {center}, 半径 {radius:.3f}')
-            # new_spheres 现在存储中心位置和半径，用于可视化
+            rospy.logdebug('Sphere: center=%s r=%.3f', np.array2string(np.asarray(center), precision=3), float(radius))
             new_spheres.append((center, radius))
         else:
-            rospy.loginfo(f'球体过大 (r={radius:.3f})，进行细分...')
+            rospy.logdebug('Sphere too large (r=%.3f); subdividing...', float(radius))
             kmeans = KMeans(n_clusters=num_sub_clusters, n_init=10).fit(cluster_points)
             sub_labels = kmeans.labels_
             sub_unique_labels = np.unique(sub_labels)
             for sub_label in sub_unique_labels:
                 sub_cluster_points = cluster_points[sub_labels == sub_label]
-                # 参考代码：每次递归增加子簇数量 (num_sub_clusters + 1)
                 self.fit_and_subdivide(sub_cluster_points, sphere_data, new_spheres, depth + 1, max_depth, num_sub_clusters + 1)
 
-    # 新增方法：获取预定义机械臂球体在 torso_lift_link 帧下的位置和半径
-    # 注意：使用 torso_lift_link 而非 base_footprint，以与 safety_filter_right.py 中的 CBF 坐标系保持一致
     def get_predefined_spheres(self, stamp=None):
-        if stamp is None:
-            stamp = rospy.Time(0)
+        # Always use latest transform for arm links (they move continuously)
+        stamp = rospy.Time(0)
             
         positions = []
         radii = []
-        radius_idx = 0  # 用于遍历 sphere_radii
-        target_frame = 'torso_lift_link'  # 与 safety_filter 的 root_frame 一致
+        radius_idx = 0
+        target_frame = 'torso_lift_link'
         
         for link_name, offsets in zip(self.arm_right_link_names, self.sphere_offsets):
             for offset in offsets:
                 pt = PointStamped()
                 pt.header.frame_id = link_name
-                pt.header.stamp = stamp  # 使用指定的时间戳
+                pt.header.stamp = stamp
                 pt.point.x, pt.point.y, pt.point.z = offset
                 try:
                     self.tf_listener.waitForTransform(
-                        target_frame, link_name, pt.header.stamp, rospy.Duration(0.1) # 减少等待时间
+                        target_frame, link_name, pt.header.stamp, rospy.Duration(self.tf_timeout)
                     )
                     pt_transformed = self.tf_listener.transformPoint(target_frame, pt)
                     pos = [pt_transformed.point.x, pt_transformed.point.y, pt_transformed.point.z]
                     positions.append(pos)
                     radii.append(self.sphere_radii[radius_idx])
-                    # rospy.logdebug(f'预定义球体 {radius_idx}: {link_name} -> {target_frame}: {pos}, r={self.sphere_radii[radius_idx]:.3f}')
                     radius_idx += 1
                 except Exception as e:
-                    # rospy.logwarn(f'TF变换失败 for predefined sphere in {link_name}: {e}')
-                    radius_idx += 1  # 仍然增加索引，保持与 sphere_radii 同步
+                    rospy.logwarn_throttle(5.0, 'Failed to transform arm sphere %s: %s', link_name, str(e))
+                    radius_idx += 1
         
-        rospy.loginfo(f'成功获取 {len(positions)} 个预定义机械臂球体在 {target_frame} 坐标系下（共 {len(self.sphere_radii)} 个）')
+        rospy.logdebug('Predefined arm spheres: %d/%d transformed into %s.',
+                       len(positions), len(self.sphere_radii), target_frame)
         return np.array(positions), np.array(radii)
 
-    def publish_pointcloud(self, points, colors, frame_id='xtion_rgb_optical_frame'):
-        """发布点云到 RViz"""
+    def publish_pointcloud(self, points, colors, frame_id=None):
+        """Publish a point cloud for RViz."""
         if points is None or len(points) == 0:
             return
+
+        if frame_id is None:
+            frame_id = self.camera_frame
         
         header = Header()
         header.stamp = rospy.Time.now()
@@ -465,166 +468,195 @@ class PointCloudToSpheres:
         
         self.pointcloud_pub.publish(cloud_msg)
     
-    def publish_sphere_markers(self, spheres, frame_id='xtion_rgb_optical_frame'):
-        """发布球体中心标记到 RViz"""
+    def publish_sphere_markers(self, spheres, frame_id=None):
+        """Publish sphere markers for RViz."""
+        if frame_id is None:
+            frame_id = self.camera_frame
+        
+        rospy.loginfo('Publishing %d sphere markers in frame: %s', len(spheres), frame_id)
+        
         marker_array = MarkerArray()
         
-        # 删除旧的标记
+        # Delete all previous markers
         delete_marker = Marker()
         delete_marker.action = Marker.DELETEALL
         marker_array.markers.append(delete_marker)
         
-        # 添加新的球体中心标记
+        # Add current sphere centers (using ACTUAL sphere radius for scale)
         for i, (center, radius) in enumerate(spheres):
             marker = Marker()
             marker.header.frame_id = frame_id
-            marker.header.stamp = rospy.Time.now()
-            marker.ns = "sphere_centers"
+            marker.header.stamp = rospy.Time(0)  # Use latest transform
+            marker.ns = "detected_spheres"
             marker.id = i
             marker.type = Marker.SPHERE
             marker.action = Marker.ADD
             
-            # 设置位置
             marker.pose.position.x = center[0]
             marker.pose.position.y = center[1]
             marker.pose.position.z = center[2]
             marker.pose.orientation.w = 1.0
             
-            # 设置大小（显示为小球）
-            marker.scale.x = 0.05  # 5cm 直径的标记
-            marker.scale.y = 0.05
-            marker.scale.z = 0.05
+            # Use the actual sphere radius * 2 for diameter
+            diameter = radius * 2.0
+            marker.scale.x = diameter
+            marker.scale.y = diameter
+            marker.scale.z = diameter
             
-            # 设置颜色（红色）
+            # Semi-transparent red
             marker.color.r = 1.0
             marker.color.g = 0.0
             marker.color.b = 0.0
-            marker.color.a = 1.0
+            marker.color.a = 0.5
             
-            marker.lifetime = rospy.Duration(2.0)  # 1秒后自动消失
+            marker.lifetime = rospy.Duration(5.0)  # Longer lifetime
             
             marker_array.markers.append(marker)
+            
+            rospy.loginfo('  Marker %d: pos=(%.3f, %.3f, %.3f) radius=%.3f frame=%s', 
+                         i, center[0], center[1], center[2], radius, frame_id)
         
         self.marker_pub.publish(marker_array)
-        rospy.loginfo(f'发布 {len(spheres)} 个球体中心标记到 RViz')
+        rospy.loginfo('Published MarkerArray with %d markers to /sphere_markers', len(marker_array.markers))
 
-    def process_pointcloud(self, event=None):  # ROS1 Timer callback 需要 event 参数
-        # 生成点云
-        points, colors = self.generate_pointcloud()
-        if points is None:
+    def process_pointcloud(self, event=None):  # ROS1 Timer callback requires the event arg
+        if self.pointcloud_data is None:
+            rospy.logwarn_throttle(5.0, 'No point cloud data available yet.')
             return
 
-        rospy.loginfo(f'原始点云点数: {len(points)}')
+        points = self.pointcloud_data['points'].copy()
+        colors = None
 
-        # 发布原始点云到 RViz（下采样前）
+        rospy.logdebug_throttle(1.0, 'Raw points: %d', len(points))
+
+        # Publish a thin point cloud preview for RViz
         if len(points) > 1000:
-            # 随机采样以减少数据量
             indices = np.random.choice(len(points), 1000, replace=False)
-            self.publish_pointcloud(points[indices], colors[indices] if colors is not None else None)
+            self.publish_pointcloud(points[indices], None, frame_id=self.camera_frame)
         else:
-            self.publish_pointcloud(points, colors)
+            self.publish_pointcloud(points, None, frame_id=self.camera_frame)
 
-        # 1. 体素下采样 - 参考代码使用 0.02m 体素大小（更大的下采样）
-        voxel_size = 0.02
-        voxel_dict = {}
-        for i, point in enumerate(points):
-            voxel_key = tuple((point / voxel_size).astype(int))
-            if voxel_key not in voxel_dict:
-                voxel_dict[voxel_key] = i
-        
-        downsampled_indices = list(voxel_dict.values())
-        points = points[downsampled_indices]
-        if colors is not None:
-            colors = colors[downsampled_indices]
-        
-        rospy.loginfo(f'下采样后点数: {len(points)}')
+        # 1) Voxel downsample
+        if self.use_open3d_voxel:
+            if o3d is None:
+                rospy.logwarn_throttle(5.0, 'open3d is not available; falling back to numpy voxel downsample.')
+                points, colors = self.voxel_downsample(points, colors, voxel_size=self.voxel_size)
+            else:
+                pcd = o3d.geometry.PointCloud()
+                pcd.points = o3d.utility.Vector3dVector(np.asarray(points))
+                if colors is not None:
+                    pcd.colors = o3d.utility.Vector3dVector(np.asarray(colors))
+                pcd = pcd.voxel_down_sample(voxel_size=float(self.voxel_size))
+                points = np.asarray(pcd.points)
+                if colors is not None and len(pcd.colors) == len(pcd.points):
+                    colors = np.asarray(pcd.colors)
+                else:
+                    colors = None
+        else:
+            points, colors = self.voxel_downsample(points, colors, voxel_size=self.voxel_size)
+
+        rospy.loginfo('Points after downsample: %d', len(points))
 
         if len(points) < 50:
-            rospy.logwarn(f'下采样后点云太少 ({len(points)} 点)，跳过处理')
+            rospy.logwarn_throttle(2.0, 'Too few points after downsample (%d); skipping.', len(points))
             return
 
-        # 2. DBSCAN聚类 - 参考代码使用 (ε = 0.10m, minPts = 50)
-        # 更宽松的参数可以更好地识别较大的障碍物
-        db = DBSCAN(eps=0.10, min_samples=50).fit(points)
+        # --- Base-Frame Height Filter (Workspace Restriction) ---
+        processing_frame = self.camera_frame
+        stamp = self.last_cloud_time if self.last_cloud_time else rospy.Time(0)
+
+        if self.workspace_min_z is not None:
+            transformed_points = self.transform_points(points, self.base_frame, self.camera_frame, stamp)
+
+            if transformed_points is not None:
+                mask = transformed_points[:, 2] > self.workspace_min_z
+                filtered_points = transformed_points[mask]
+
+                rospy.loginfo_throttle(1.0, 'Height filter (%s > %.2f): %d -> %d points',
+                                       self.base_frame, self.workspace_min_z, len(points), len(filtered_points))
+
+                points = filtered_points
+                processing_frame = self.base_frame
+            else:
+                rospy.logwarn_throttle(2.0, 'Could not transform points to %s for height filtering.', self.base_frame)
+
+        if len(points) < 50:
+            rospy.logwarn_throttle(2.0, 'Too few points after height filter (%d); skipping.', len(points))
+            return
+
+        # 2) DBSCAN clustering
+        db = DBSCAN(eps=0.10, min_samples=25).fit(points)
         labels = db.labels_
         unique_labels = np.unique(labels)
-        unique_labels = unique_labels[unique_labels != -1]  # 忽略噪声簇
+        unique_labels = unique_labels[unique_labels != -1]
 
-        rospy.loginfo(f'DBSCAN找到 {len(unique_labels)} 个簇')
+        rospy.loginfo_throttle(1.0, 'DBSCAN clusters: %d', len(unique_labels))
 
         if len(unique_labels) == 0:
-            rospy.logwarn('DBSCAN未找到有效簇，跳过球体生成')
+            rospy.logwarn_throttle(2.0, 'No valid DBSCAN clusters; skipping.')
             return
 
-        sphere_data = []  # 相机坐标系下的球体
+        sphere_data = []
         new_spheres = []
         for label in unique_labels:
             cluster_points = points[labels == label]
-            rospy.loginfo(f'簇 {label}: {len(cluster_points)} 个点')
-            
-            # 参考代码中移除了平面检测，直接进行球体拟合和细分
+            rospy.logdebug('Cluster %s: %d points', str(label), len(cluster_points))
             self.fit_and_subdivide(cluster_points, sphere_data, new_spheres)
 
-        # 球体中心变换到 torso_lift_link 坐标系（与 safety_filter 的 CBF 计算一致）
+        # Transform centers into torso_lift_link (for safety_filter compatibility)
         target_frame = 'torso_lift_link'
-        rospy.loginfo(f'相机坐标系下生成 {len(sphere_data)} 个球体，开始变换到 {target_frame}...')
-        
-        transformed_sphere_data = []  # torso_lift_link 坐标系（用于过滤和发布）
-        
+        rospy.logdebug('Spheres in %s: %d; transforming into %s...', processing_frame, len(sphere_data), target_frame)
+
+        transformed_sphere_data = []
+
         for center_x, center_y, center_z, radius in sphere_data:
-            # 变换到 torso_lift_link
-            center_torso = self.transform_center([center_x, center_y, center_z], target_frame)
+            center_torso = self.transform_center([center_x, center_y, center_z], target_frame, source_frame=processing_frame)
             if center_torso is not None:
                 transformed_sphere_data.append((center_torso[0], center_torso[1], center_torso[2], radius))
             else:
-                rospy.logwarn(f'球体中心变换到 {target_frame} 失败，跳过此球体')
-        
-        rospy.loginfo(f'成功变换 {len(transformed_sphere_data)} 个球体到 {target_frame} 坐标系')
+                rospy.logdebug('Skipping sphere: TF transform failed.')
 
-        # 新增：获取预定义球体（torso_lift_link 坐标系）
-        # 使用深度图时间戳，确保过滤时机械臂位置与点云时刻一致
-        stamp = self.last_depth_time if self.last_depth_time else rospy.Time(0)
+        rospy.logdebug('Transformed spheres: %d', len(transformed_sphere_data))
+
+        # Predefined spheres at the same timestamp
+        stamp = self.last_cloud_time if self.last_cloud_time else rospy.Time(0)
         predefined_positions, predefined_radii = self.get_predefined_spheres(stamp)
-        
-        if predefined_positions.size == 0:
-            rospy.logwarn('未获取到预定义球体，跳过过滤（将包含机械臂球体）')
-        else:
-            rospy.loginfo(f'获取到 {len(predefined_positions)} 个预定义球体，开始过滤...')
 
-        # 新增：在 torso_lift_link 坐标系下过滤掉与预定义球体重叠的检测球体
+        if predefined_positions.size == 0:
+            rospy.logwarn_throttle(2.0, 'No predefined arm spheres available; filtering disabled.')
+
+        # Filter detections overlapping the predefined arm spheres
         filtered_sphere_data = []
         num_filtered = 0
-        
+
         for detect_x, detect_y, detect_z, detect_r in transformed_sphere_data:
             is_overlapping = False
             detect_center = np.array([detect_x, detect_y, detect_z])
-            
+
             if predefined_positions.size > 0:
                 for i in range(len(predefined_positions)):
                     pre_center = predefined_positions[i]
                     pre_r = predefined_radii[i]
                     dist = np.linalg.norm(detect_center - pre_center)
-                    
-                    # 使用更宽松的重叠判定：距离 < (半径1 + 半径2) * 1.2
+
                     overlap_threshold = (pre_r + detect_r) * 1.2
-                    
+
                     if dist < overlap_threshold:
                         is_overlapping = True
-                        rospy.loginfo(f'排除重叠球体: 检测={detect_center.round(3)}, r={detect_r:.3f}; '
-                                    f'预定义={pre_center.round(3)}, r={pre_r:.3f}; 距离={dist:.3f} < 阈值={overlap_threshold:.3f}')
+                        rospy.logdebug('Filtered overlap: det=%s r=%.3f vs arm=%s r=%.3f (d=%.3f < %.3f)',
+                                      np.array2string(detect_center, precision=3), float(detect_r),
+                                      np.array2string(pre_center, precision=3), float(pre_r),
+                                      float(dist), float(overlap_threshold))
                         num_filtered += 1
                         break
-                        
+
             if not is_overlapping:
                 filtered_sphere_data.append((detect_x, detect_y, detect_z, detect_r))
-        
-        rospy.loginfo(f'过滤结果: 原始 {len(transformed_sphere_data)} 个球体，过滤掉 {num_filtered} 个，剩余 {len(filtered_sphere_data)} 个')
-        rospy.loginfo(f'发布球体到 /detected_spheres(torso_lift_link 坐标系)')
 
-        # NMS去重（使用过滤后的数据）- 暂时注释掉
-        # nms_spheres = sphere_nms(filtered_sphere_data, dist_thresh=0.02, radius_thresh=0.01)
+        rospy.loginfo_throttle(1.0, 'Spheres: camera=%d torso=%d filtered=%d published=%d',
+                       len(sphere_data), len(transformed_sphere_data), num_filtered, len(filtered_sphere_data))
 
-        # 直接使用过滤后的数据，不进行NMS去重
+        # Publish filtered spheres (no NMS)
         nms_spheres = filtered_sphere_data
 
         # Apply z-min and optional adjustments
@@ -632,15 +664,15 @@ class PointCloudToSpheres:
 
         # Publish
         self._publish_spheres(nms_spheres, frame_id='torso_lift_link')
-        rospy.loginfo(f'已发布 {len(nms_spheres)} 个球体到 /detected_spheres')
+        rospy.logdebug_throttle(1.0, 'Published %d spheres to /detected_spheres.', len(nms_spheres))
 
         # Record offline spheres if enabled
         if self.mode == 'record':
             try:
                 self._save_spheres_json(nms_spheres, frame_id='torso_lift_link')
-                rospy.loginfo_throttle(2.0, f'[PointCloudToSpheres] saved spheres -> {self.record_path}')
+                rospy.loginfo_throttle(2.0, '[PointCloudToSpheres] saved spheres -> %s', self.record_path)
             except Exception as e:
-                rospy.logwarn_throttle(2.0, f'[PointCloudToSpheres] save failed: {e}')
+                rospy.logwarn_throttle(2.0, '[PointCloudToSpheres] save failed: %s', str(e))
 
 def main(args=None):
     try:

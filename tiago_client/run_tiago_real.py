@@ -3,14 +3,12 @@ import os
 import numpy as np
 import cv2
 from tiago_client.tiago_client import TiagoClient
-from intent_prediction.intent_predictor_integrated import IntentPredictorIntegrated
 
 def main():
     # Initialize the real robot client
     # Default URL is http://192.168.0.110:1234/
     server_url = os.environ.get("TIAGO_SERVER_URL", "http://192.168.0.110:1234/")
     client = TiagoClient(server_url=server_url, use_teleop=True)
-
     # Optional RViz goal -> discrete goal-step assistance (client side).
     # Enable by: GOAL_STEP_FROM_RVIZ=1
     rviz_goal = None
@@ -24,9 +22,17 @@ def main():
             print(f"[REAL] RViz goal listener unavailable: {exc}")
             rviz_goal = None
     
-    # Initialize Intent Predictor
-    # Note: Ensure 'ollama' is installed and 'llava:7b' model is pulled
-    predictor = IntentPredictorIntegrated(model_name='llava:7b', analysis_interval=5.0)
+    # Conditionally initialize Intent Predictor based on ENABLE_VLM env var
+    enable_vlm = os.environ.get('ENABLE_VLM', '0') == '1'
+    predictor = None
+    
+    if enable_vlm:
+        from intent_prediction.intent_predictor_integrated import IntentPredictorIntegrated
+        # Note: Ensure 'ollama' is installed and 'gpt-40' model is pulled
+        predictor = IntentPredictorIntegrated(model_name='gpt-4o', analysis_interval=5.0)
+        print("[INFO] VLM Intent Predictor enabled")
+    else:
+        print("[INFO] VLM Intent Predictor disabled")
     
     # Print banner as single string to avoid terminal corruption from keyboard thread
     banner = (
@@ -48,9 +54,8 @@ def main():
             
             # 1. Get action from Oculus VR (includes IK and Safety Filter)
             # is_filter=True enables the teleop policy's internal smoothing
-
-            # Check for shared control target
-            assist_target = predictor.suggested_target
+            # Check for shared control target (only if VLM enabled)
+            assist_target = predictor.suggested_target if predictor else None
 
             goal_step_target = rviz_goal.get_goal_xyz().tolist() if rviz_goal is not None else None
             
@@ -65,9 +70,9 @@ def main():
                 # 2. Send action to the robot via HTTP POST
                 obs, info = client.step(action)
                 
-                # 3. Update Intent Predictor with latest observation
+                # 3. Update Intent Predictor with latest observation (if enabled)
                 # obs usually contains 'tiago_head_image' if configured in server
-                if 'tiago_head_image' in obs:
+                if predictor and 'tiago_head_image' in obs:
                     # Assuming image is decoded or needs decoding. 
                     # If it's raw bytes/base64, it might need processing in TiagoClient first.
                     # Here we assume obs['tiago_head_image'] is a numpy array (H,W,3)
@@ -114,7 +119,8 @@ def main():
             
     except KeyboardInterrupt:
         print("\n[REAL] Shutting down...")
-        predictor.stop()
+        if predictor:
+            predictor.stop()
     finally:
         client.close()
 
