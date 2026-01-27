@@ -1,0 +1,275 @@
+VLM Log Start: Tue Jan 27 12:14:31 2026
+========================================
+
+--- Timestamp: 1769544871.873943 ---
+PROMPT:
+Analyze the robot teleoperation scene.
+Describe objects and predict intent based on visual and 3D data.
+Update confidence percentage based on context in each frame.
+You are a mobile manipulator in an indoor household setting. Provide each of the following on new line and format outptut: 1. Key objects (likely indoor household objects),
+ 2. Intent,
+ 3. Movement Status (Confirm if gripper is approaching), 
+ 4. Confidence (0.0-1.0).
+RESPONSE:
+Error connecting to OpenAI: Error code: 401 - {'error': {'message': 'Incorrect API key provided: <YOUR_AP*******ERE>. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+----------------------------------------
+
+--- Timestamp: 1769544876.7922685 ---
+PROMPT:
+Analyze the robot teleoperation scene.
+Describe objects and predict intent based on visual and 3D data.
+Update confidence percentage based on context in each frame.
+You are a mobile manipulator in an indoor household setting. Provide each of the following on new line and format outptut: 1. Key objects (likely indoor household objects),
+ 2. Intent,
+ 3. Movement Status (Confirm if gripper is approaching), 
+ 4. Confidence (0.0-1.0).
+RESPONSE:
+Error connecting to OpenAI: Error code: 401 - {'error': {'message': 'Incorrect API key provided: <YOUR_AP*******ERE>. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+----------------------------------------
+
+--- Timestamp: 1769544881.8027012 ---
+PROMPT:
+Analyze the robot teleoperation scene.
+Describe objects and predict intent based on visual and 3D data.
+Update confidence percentage based on context in each frame.
+You are a mobile manipulator in an indoor household setting. Provide each of the following on new line and format outptut: 1. Key objects (likely indoor household objects),
+ 2. Intent,
+ 3. Movement Status (Confirm if gripper is approaching), 
+ 4. Confidence (0.0-1.0).
+RESPONSE:
+Error connecting to OpenAI: Error code: 401 - {'error': {'message': 'Incorrect API key provided: <YOUR_AP*******ERE>. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+----------------------------------------
+
+--- Timestamp: 1769544886.827381 ---
+PROMPT:
+Analyze the robot teleoperation scene.
+Describe objects and predict intent based on visual and 3D data.
+Update confidence percentage based on context in each frame.
+You are a mobile manipulator in an indoor household setting. Provide each of the following on new line and format outptut: 1. Key objects (likely indoor household objects),
+ 2. Intent,
+ 3. Movement Status (Confirm if gripper is approaching), 
+ 4. Confidence (0.0-1.0).
+RESPONSE:
+Error connecting to OpenAI: Error code: 401 - {'error': {'message': 'Incorrect API key provided: <YOUR_AP*******ERE>. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+----------------------------------------
+
+--- Timestamp: 1769544891.8569245 ---
+PROMPT:
+Analyze the robot teleoperation scene.
+Describe objects and predict intent based on visual and 3D data.
+Update confidence percentage based on context in each frame.
+You are a mobile manipulator in an indoor household setting. Provide each of the following on new line and format outptut: 1. Key objects (likely indoor household objects),
+ 2. Intent,
+ 3. Movement Status (Confirm if gripper is approaching), 
+ 4. Confidence (0.0-1.0).
+RESPONSE:
+Error connecting to OpenAI: Error code: 401 - {'error': {'message': 'Incorrect API key provided: <YOUR_AP*******ERE>. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+----------------------------------------
+
+--- Timestamp: 1769544896.8760333 ---
+PROMPT:
+Analyze the robot teleoperation scene.
+Describe objects and predict intent based on visual and 3D data.
+Update confidence percentage based on context in each frame.
+You are a mobile manipulator in an indoor household setting. Provide each of the following on new line and format outptut: 1. Key objects (likely indoor household objects),
+ 2. Intent,
+ 3. Movement Status (Confirm if gripper is approaching), 
+ 4. Confidence (0.0-1.0).
+RESPONSE:
+Error connecting to OpenAI: Error code: 401 - {'error': {'message': 'Incorrect API key provided: <YOUR_AP*******ERE>. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+----------------------------------------
+
+--- Timestamp: 1769544901.9190176 ---
+PROMPT:
+Analyze the robot teleoperation scene.
+Describe objects and predict intent based on visual and 3D data.
+Update confidence percentage based on context in each frame.
+You are a mobile manipulator in an indoor household setting. Provide each of the following on new line and format outptut: 1. Key objects (likely indoor household objects),
+ 2. Intent,
+ 3. Movement Status (Confirm if gripper is approaching), 
+ 4. Confidence (0.0-1.0).
+RESPONSE:
+Error connecting to OpenAI: Error code: 401 - {'error': {'message': 'Incorrect API key provided: <YOUR_AP*******ERE>. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+----------------------------------------
+
+--- Timestamp: 1769544906.9588835 ---
+PROMPT:
+Analyze the robot teleoperation scene.
+Describe objects and predict intent based on visual and 3D data.
+Update confidence percentage based on context in each frame.
+You are a mobile manipulator in an indoor household setting. Provide each of the following on new line and format outptut: 1. Key objects (likely indoor household objects),
+ 2. Intent,
+ 3. Movement Status (Confirm if gripper is approaching), 
+ 4. Confidence (0.0-1.0).
+RESPONSE:
+Error connecting to OpenAI: Error code: 401 - {'error': {'message': 'Incorrect API key provided: <YOUR_AP*******ERE>. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+----------------------------------------
+
+--- Timestamp: 1769544911.9748018 ---
+PROMPT:
+Analyze the robot teleoperation scene.
+Describe objects and predict intent based on visual and 3D data.
+Update confidence percentage based on context in each frame.
+You are a mobile manipulator in an indoor household setting. Provide each of the following on new line and format outptut: 1. Key objects (likely indoor household objects),
+ 2. Intent,
+ 3. Movement Status (Confirm if gripper is approaching), 
+ 4. Confidence (0.0-1.0).
+RESPONSE:
+Error connecting to OpenAI: Error code: 401 - {'error': {'message': 'Incorrect API key provided: <YOUR_AP*******ERE>. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+----------------------------------------
+
+--- Timestamp: 1769544917.0165384 ---
+PROMPT:
+Analyze the robot teleoperation scene.
+Describe objects and predict intent based on visual and 3D data.
+Update confidence percentage based on context in each frame.
+You are a mobile manipulator in an indoor household setting. Provide each of the following on new line and format outptut: 1. Key objects (likely indoor household objects),
+ 2. Intent,
+ 3. Movement Status (Confirm if gripper is approaching), 
+ 4. Confidence (0.0-1.0).
+RESPONSE:
+Error connecting to OpenAI: Error code: 401 - {'error': {'message': 'Incorrect API key provided: <YOUR_AP*******ERE>. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+----------------------------------------
+
+--- Timestamp: 1769544922.0353203 ---
+PROMPT:
+Analyze the robot teleoperation scene.
+Describe objects and predict intent based on visual and 3D data.
+Update confidence percentage based on context in each frame.
+You are a mobile manipulator in an indoor household setting. Provide each of the following on new line and format outptut: 1. Key objects (likely indoor household objects),
+ 2. Intent,
+ 3. Movement Status (Confirm if gripper is approaching), 
+ 4. Confidence (0.0-1.0).
+RESPONSE:
+Error connecting to OpenAI: Error code: 401 - {'error': {'message': 'Incorrect API key provided: <YOUR_AP*******ERE>. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+----------------------------------------
+
+--- Timestamp: 1769544927.05548 ---
+PROMPT:
+Analyze the robot teleoperation scene.
+Describe objects and predict intent based on visual and 3D data.
+Update confidence percentage based on context in each frame.
+You are a mobile manipulator in an indoor household setting. Provide each of the following on new line and format outptut: 1. Key objects (likely indoor household objects),
+ 2. Intent,
+ 3. Movement Status (Confirm if gripper is approaching), 
+ 4. Confidence (0.0-1.0).
+RESPONSE:
+Error connecting to OpenAI: Error code: 401 - {'error': {'message': 'Incorrect API key provided: <YOUR_AP*******ERE>. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+----------------------------------------
+
+--- Timestamp: 1769544932.076025 ---
+PROMPT:
+Analyze the robot teleoperation scene.
+Describe objects and predict intent based on visual and 3D data.
+Update confidence percentage based on context in each frame.
+You are a mobile manipulator in an indoor household setting. Provide each of the following on new line and format outptut: 1. Key objects (likely indoor household objects),
+ 2. Intent,
+ 3. Movement Status (Confirm if gripper is approaching), 
+ 4. Confidence (0.0-1.0).
+RESPONSE:
+Error connecting to OpenAI: Error code: 401 - {'error': {'message': 'Incorrect API key provided: <YOUR_AP*******ERE>. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+----------------------------------------
+
+--- Timestamp: 1769544937.0867443 ---
+PROMPT:
+Analyze the robot teleoperation scene.
+Describe objects and predict intent based on visual and 3D data.
+Update confidence percentage based on context in each frame.
+You are a mobile manipulator in an indoor household setting. Provide each of the following on new line and format outptut: 1. Key objects (likely indoor household objects),
+ 2. Intent,
+ 3. Movement Status (Confirm if gripper is approaching), 
+ 4. Confidence (0.0-1.0).
+RESPONSE:
+Error connecting to OpenAI: Error code: 401 - {'error': {'message': 'Incorrect API key provided: <YOUR_AP*******ERE>. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+----------------------------------------
+
+--- Timestamp: 1769544942.1100862 ---
+PROMPT:
+Analyze the robot teleoperation scene.
+Describe objects and predict intent based on visual and 3D data.
+Update confidence percentage based on context in each frame.
+You are a mobile manipulator in an indoor household setting. Provide each of the following on new line and format outptut: 1. Key objects (likely indoor household objects),
+ 2. Intent,
+ 3. Movement Status (Confirm if gripper is approaching), 
+ 4. Confidence (0.0-1.0).
+RESPONSE:
+Error connecting to OpenAI: Error code: 401 - {'error': {'message': 'Incorrect API key provided: <YOUR_AP*******ERE>. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+----------------------------------------
+
+--- Timestamp: 1769544947.1303494 ---
+PROMPT:
+Analyze the robot teleoperation scene.
+Describe objects and predict intent based on visual and 3D data.
+Update confidence percentage based on context in each frame.
+You are a mobile manipulator in an indoor household setting. Provide each of the following on new line and format outptut: 1. Key objects (likely indoor household objects),
+ 2. Intent,
+ 3. Movement Status (Confirm if gripper is approaching), 
+ 4. Confidence (0.0-1.0).
+RESPONSE:
+Error connecting to OpenAI: Error code: 401 - {'error': {'message': 'Incorrect API key provided: <YOUR_AP*******ERE>. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+----------------------------------------
+
+--- Timestamp: 1769544952.1420763 ---
+PROMPT:
+Analyze the robot teleoperation scene.
+Describe objects and predict intent based on visual and 3D data.
+Update confidence percentage based on context in each frame.
+You are a mobile manipulator in an indoor household setting. Provide each of the following on new line and format outptut: 1. Key objects (likely indoor household objects),
+ 2. Intent,
+ 3. Movement Status (Confirm if gripper is approaching), 
+ 4. Confidence (0.0-1.0).
+RESPONSE:
+Error connecting to OpenAI: Error code: 401 - {'error': {'message': 'Incorrect API key provided: <YOUR_AP*******ERE>. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+----------------------------------------
+
+--- Timestamp: 1769544957.16239 ---
+PROMPT:
+Analyze the robot teleoperation scene.
+Describe objects and predict intent based on visual and 3D data.
+Update confidence percentage based on context in each frame.
+You are a mobile manipulator in an indoor household setting. Provide each of the following on new line and format outptut: 1. Key objects (likely indoor household objects),
+ 2. Intent,
+ 3. Movement Status (Confirm if gripper is approaching), 
+ 4. Confidence (0.0-1.0).
+RESPONSE:
+Error connecting to OpenAI: Error code: 401 - {'error': {'message': 'Incorrect API key provided: <YOUR_AP*******ERE>. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+----------------------------------------
+
+--- Timestamp: 1769544962.188561 ---
+PROMPT:
+Analyze the robot teleoperation scene.
+Describe objects and predict intent based on visual and 3D data.
+Update confidence percentage based on context in each frame.
+You are a mobile manipulator in an indoor household setting. Provide each of the following on new line and format outptut: 1. Key objects (likely indoor household objects),
+ 2. Intent,
+ 3. Movement Status (Confirm if gripper is approaching), 
+ 4. Confidence (0.0-1.0).
+RESPONSE:
+Error connecting to OpenAI: Error code: 401 - {'error': {'message': 'Incorrect API key provided: <YOUR_AP*******ERE>. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+----------------------------------------
+
+--- Timestamp: 1769544967.20682 ---
+PROMPT:
+Analyze the robot teleoperation scene.
+Describe objects and predict intent based on visual and 3D data.
+Update confidence percentage based on context in each frame.
+You are a mobile manipulator in an indoor household setting. Provide each of the following on new line and format outptut: 1. Key objects (likely indoor household objects),
+ 2. Intent,
+ 3. Movement Status (Confirm if gripper is approaching), 
+ 4. Confidence (0.0-1.0).
+RESPONSE:
+Error connecting to OpenAI: Error code: 401 - {'error': {'message': 'Incorrect API key provided: <YOUR_AP*******ERE>. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+----------------------------------------
+
+--- Timestamp: 1769544972.2222233 ---
+PROMPT:
+Analyze the robot teleoperation scene.
+Describe objects and predict intent based on visual and 3D data.
+Update confidence percentage based on context in each frame.
+You are a mobile manipulator in an indoor household setting. Provide each of the following on new line and format outptut: 1. Key objects (likely indoor household objects),
+ 2. Intent,
+ 3. Movement Status (Confirm if gripper is approaching), 
+ 4. Confidence (0.0-1.0).
+RESPONSE:
+Error connecting to OpenAI: Error code: 401 - {'error': {'message': 'Incorrect API key provided: <YOUR_AP*******ERE>. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+----------------------------------------

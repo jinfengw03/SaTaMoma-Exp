@@ -22,7 +22,7 @@ class SpeechInputTest:
             '1': "I am hungry. Pick up the food.",
             '2': "I am thirsty",
             '3': "I want to drink water",
-            '4': "Please hand me the book",
+            '4': "I want to study using whiteboard",
             '5': "Can you get me the red cup",
             '6': "I need the remote control",
             '7': "Bring me that tool",

@@ -1,0 +1,28 @@
+VLM Log Start: Tue Jan 27 11:59:39 2026
+========================================
+
+--- Timestamp: 1769543979.4468796 ---
+PROMPT:
+Analyze the robot teleoperation scene.
+Describe objects and predict intent based on visual and 3D data.
+Update confidence percentage based on context in each frame.
+You are a mobile manipulator in an indoor household setting. Provide each of the following on new line and format outptut: 1. Key objects (likely indoor household objects),
+ 2. Intent,
+ 3. Movement Status (Confirm if gripper is approaching), 
+ 4. Confidence (0.0-1.0).
+RESPONSE:
+Error connecting to OpenAI: Error code: 401 - {'error': {'message': 'Incorrect API key provided: <YOUR_AP*******ERE>. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+----------------------------------------
+
+--- Timestamp: 1769543984.3842344 ---
+PROMPT:
+Analyze the robot teleoperation scene.
+Describe objects and predict intent based on visual and 3D data.
+Update confidence percentage based on context in each frame.
+You are a mobile manipulator in an indoor household setting. Provide each of the following on new line and format outptut: 1. Key objects (likely indoor household objects),
+ 2. Intent,
+ 3. Movement Status (Confirm if gripper is approaching), 
+ 4. Confidence (0.0-1.0).
+RESPONSE:
+Error connecting to OpenAI: Error code: 401 - {'error': {'message': 'Incorrect API key provided: <YOUR_AP*******ERE>. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+----------------------------------------
