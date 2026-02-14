@@ -20,6 +20,8 @@ The keyboard interface runs in the terminal where you launched the script. Ensur
 | Key | Action |
 | --- | --- |
 | `Tab` | Switch between **Cartesian** and **Joint** modes (Currently only Cartesian affects arm path) |
+| `V` | Toggle **Goal-Step Assist** enable/disable |
+| `B` | **Cancel** current auto-approach (stop moving toward goal) |
 | `Ctrl+C` | Exit |
 
 ### Mobile Base (Always Active)
@@ -51,7 +53,12 @@ Controls the end-effector position relative to the base.
 | **Y** (Left/Right) | `J` | `L` | Move arm left/right |
 | **Z** (Up/Down) | `U` | `O` | Move arm up/down |
 
-*(Note: Currently, keyboard orientation control (Roll/Pitch/Yaw) is not mapped in `HybridTeleopPolicy`)*
+### Right Arm Orientation (Cartesian Mode)
+| Axis | Increase (+) | Decrease (-) |
+| --- | --- | --- |
+| Roll | `R` | `F` |
+| Pitch | `T` | `G` |
+| Yaw | `Y` | `H` |
 
 ---
 
@@ -63,18 +70,10 @@ The current implementation of `HybridTeleopPolicy` (`tiago_client/tiago_client/o
     *   Although you can switch to `JOINT` mode with `Tab`, the `TiagoClient`'s internal logic (`get_teleop_action` method) currently expects Cartesian deltas (`[x, y, z, r, p, y]`) to perform IK.
     *   Direct joint angle inputs from the keyboard are currently **ignored** or not processed correctly by the main client loop. Only Cartesian inputs work for the arm.
 
-2.  **No Orientation Control**:
-    *   The keyboard mapping supports X, Y, Z translation but **does not** currently map keys for Roll, Pitch, or Yaw rotation of the end-effector.
-
-3.  **Head Control**:
-    *   The standalone script supports arrow keys for head control. This feature has **not** been ported to `HybridTeleopPolicy` yet. The head will remain in its default or server-controlled position.
-
-4.  **Left Arm**:
+2.  **Left Arm**:
     *   Controls are currently mapped **only for the Right Arm**. The Left Arm cannot be controlled via keyboard in this version.
 
 ## Development Status
 This module is experimental. Future updates should address:
-- [ ] Mapping keys for End-Effector Orientation (R/P/Y).
 - [ ] Modifying `TiagoClient` to accept direct Joint commands (bypassing IK) for Joint Mode support.
-- [ ] Adding Head control support.
 - [ ] Adding Left Arm toggle support.

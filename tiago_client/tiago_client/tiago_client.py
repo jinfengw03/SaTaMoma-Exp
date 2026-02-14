@@ -227,6 +227,18 @@ class TiagoClient:
         # Get raw Cartesian action from Oculus
         raw_action = self.teleop.get_action(obs, is_filter=is_filter)
         buttons = raw_action.extra.get('buttons', {})
+
+        # Allow teleop interface to control goal-step assist via button events.
+        # Keyboard mode (HybridTeleopPolicy):
+        # - buttons['goal_step_cancel'] (pulse): stop current auto-approach
+        # - buttons['goal_step_enabled'] (latched): enable/disable feature
+        if isinstance(buttons, dict):
+            if buttons.get('goal_step_cancel', False):
+                self.goal_step_assist.reset()
+            if 'goal_step_enabled' in buttons:
+                self.goal_step_assist.config.enabled = bool(buttons.get('goal_step_enabled'))
+                if not self.goal_step_assist.config.enabled:
+                    self.goal_step_assist.reset()
         
         safe_action = {}
         
@@ -278,6 +290,8 @@ class TiagoClient:
                         ):
                             manual_active = float(np.linalg.norm(np.asarray(cartesian_delta, dtype=float))) > 1e-3
                             if manual_active:
+                                # User is actively controlling; cancel any ongoing auto-approach.
+                                self.goal_step_assist.reset()
                                 self._goal_step_last_manual_joint_target = np.asarray(joint_goal, dtype=float).copy()
                                 self._goal_step_last_manual_gripper = float(gripper_val)
                             if (
@@ -308,6 +322,8 @@ class TiagoClient:
                         ):
                             manual_active = float(np.linalg.norm(np.asarray(cartesian_delta, dtype=float))) > 1e-3
                             if manual_active:
+                                # User is actively controlling; cancel any ongoing auto-approach.
+                                self.goal_step_assist.reset()
                                 self._goal_step_last_manual_joint_target = np.asarray(joints_curr, dtype=float).copy()
                                 self._goal_step_last_manual_gripper = float(gripper_val)
                             if (
@@ -340,8 +356,12 @@ class TiagoClient:
                     joint_goal = self.ik_solvers['right'].find_ik(target_pos, target_quat, right_joints)
                     if joint_goal is not None:
                         safe_action['right'] = np.concatenate([np.asarray(joint_goal, dtype=float), [gripper_val]])
+                        # Record the sent command so the assist can gate the next interpolated step.
+                        self.goal_step_assist.notify_auto_arm_command(joint_goal, gripper_val)
                     else:
                         safe_action['right'] = np.concatenate([np.asarray(right_joints, dtype=float), [gripper_val]])
+                        # If IK fails during auto-approach, abort assistance.
+                        self.goal_step_assist.reset()
         
         # Process base, torso, and head (direct pass-through)
         if 'base' in raw_action:

@@ -7,7 +7,8 @@ SaTaMoma-Exp's client-side teleop pipeline:
 
 - User provides a manual arm command (via VR/keyboard -> Cartesian delta -> IK -> safety).
 - Once the commanded joint target is *reached* (within tolerance for a hold time), the
-  end-effector takes *one extra small step* toward a fixed goal point.
+ - Once the commanded joint target is *reached* (within tolerance for a hold time), the
+     end-effector takes *small steps* toward a fixed goal point until it gets near the goal.
 
 It is intentionally ROS-agnostic: callers provide current joint/EEF state and decide
 how to run IK and safety filtering.
@@ -31,11 +32,16 @@ class GoalStepAssistConfig:
 
     step_size: float = 0.03
     stop_distance: float = 0.02
+    # If the goal is already closer than this when auto-approach would start, do nothing.
+    # (Once auto-approach starts, it will continue down to `stop_distance`.)
     assist_disable_distance: float = 0.15
 
     reach_tolerance: float = 0.03
     reach_timeout: float = 2.5
     reach_hold_time: float = 0.15
+
+    # Safety guard: maximum total duration for the automatic approach phase.
+    auto_max_time: float = 12.0
 
     eps: float = 1e-6
 
@@ -49,7 +55,9 @@ class GoalStepAssist:
         self._pending_gripper: float = 0.0
         self._armed_time: Optional[float] = None
         self._reached_since: Optional[float] = None
-        self._stepped: bool = False
+
+        self._auto_active: bool = False
+        self._auto_started_time: Optional[float] = None
 
     def set_goal_xyz(self, goal_xyz: Optional[np.ndarray]) -> None:
         self.goal_xyz = None if goal_xyz is None else np.asarray(goal_xyz, dtype=float).reshape(3)
@@ -58,7 +66,9 @@ class GoalStepAssist:
         self._pending_joint_target = None
         self._armed_time = None
         self._reached_since = None
-        self._stepped = False
+
+        self._auto_active = False
+        self._auto_started_time = None
 
     def notify_manual_arm_command(self, joint_target: np.ndarray, gripper_val: float, now: Optional[float] = None) -> None:
         """Call this when you *send* a new manual arm joint command."""
@@ -67,7 +77,26 @@ class GoalStepAssist:
         self._pending_gripper = float(gripper_val)
         self._armed_time = now
         self._reached_since = None
-        self._stepped = False
+
+        # Arm a fresh auto-approach sequence (will start only after the manual target is reached).
+        self._auto_active = False
+        self._auto_started_time = None
+
+    def notify_auto_arm_command(self, joint_target: np.ndarray, gripper_val: float, now: Optional[float] = None) -> None:
+        """Call this when you *send* an automatic goal-approach joint command.
+
+        This lets the assist gate the *next* interpolated step on the robot reaching the
+        command that was just sent.
+        """
+        now = time.time() if now is None else float(now)
+        self._pending_joint_target = np.asarray(joint_target, dtype=float).copy()
+        self._pending_gripper = float(gripper_val)
+        self._armed_time = now
+        self._reached_since = None
+        # Keep auto mode active.
+        if self._auto_started_time is None:
+            self._auto_started_time = now
+        self._auto_active = True
 
     def maybe_compute_goal_step(
         self,
@@ -76,7 +105,7 @@ class GoalStepAssist:
         current_quat: np.ndarray,
         now: Optional[float] = None,
     ) -> Optional[Tuple[np.ndarray, np.ndarray, float]]:
-        """If conditions are met, returns (target_pos, target_quat, gripper_val) for a *single* goal step."""
+        """If conditions are met, returns (target_pos, target_quat, gripper_val) for the next goal-approach step."""
         cfg = self.config
         if not cfg.enabled:
             return None
@@ -84,10 +113,14 @@ class GoalStepAssist:
             return None
         if self._pending_joint_target is None or self._armed_time is None:
             return None
-        if self._stepped:
-            return None
 
         now = time.time() if now is None else float(now)
+
+        if self._auto_active and (self._auto_started_time is not None):
+            if (now - self._auto_started_time) > cfg.auto_max_time:
+                self.reset()
+                return None
+
         if (now - self._armed_time) > cfg.reach_timeout:
             self.reset()
             return None
@@ -111,14 +144,26 @@ class GoalStepAssist:
         delta = self.goal_xyz - current_pos
         dist = float(np.linalg.norm(delta))
 
-        # Same behavior as original: don't assist very near the goal.
-        if dist <= cfg.assist_disable_distance or dist <= cfg.stop_distance:
+        # Termination: close enough.
+        if dist <= cfg.stop_distance:
             self.reset()
             return None
 
-        direction = delta / (dist + 1e-9)
-        step = min(cfg.step_size, dist)
-        target_pos = current_pos + direction * step
+        # If we haven't started auto yet, optionally skip assisting when already very close.
+        if (not self._auto_active) and (dist <= cfg.assist_disable_distance):
+            self.reset()
+            return None
 
-        self._stepped = True
+        if not self._auto_active:
+            self._auto_active = True
+            self._auto_started_time = now
+
+        direction = delta / (dist + 1e-9)
+        # Move towards goal but stop just outside stop_distance.
+        remaining = max(0.0, dist - cfg.stop_distance)
+        step = min(cfg.step_size, remaining)
+        if step <= cfg.eps:
+            self.reset()
+            return None
+        target_pos = current_pos + direction * step
         return target_pos, current_quat, float(self._pending_gripper)

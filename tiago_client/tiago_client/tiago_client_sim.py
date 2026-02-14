@@ -182,6 +182,15 @@ class TiagoClientSim:
         
         raw_action = self.teleop.get_action(obs, is_filter=is_filter)
         buttons = raw_action.extra.get('buttons', {})
+
+        # Allow teleop interface to control goal-step assist via button events.
+        if isinstance(buttons, dict):
+            if buttons.get('goal_step_cancel', False):
+                self.goal_step_assist.reset()
+            if 'goal_step_enabled' in buttons:
+                self.goal_step_assist.config.enabled = bool(buttons.get('goal_step_enabled'))
+                if not self.goal_step_assist.config.enabled:
+                    self.goal_step_assist.reset()
         
         safe_action = {}
         
@@ -217,6 +226,8 @@ class TiagoClientSim:
                         ):
                             manual_active = float(np.linalg.norm(np.asarray(cartesian_delta, dtype=float))) > 1e-3
                             if manual_active:
+                                # User is actively controlling; cancel any ongoing auto-approach.
+                                self.goal_step_assist.reset()
                                 self._goal_step_last_manual_joint_target = np.asarray(joint_safe, dtype=float).copy()
                                 self._goal_step_last_manual_gripper = float(gripper_val)
                             if (
@@ -239,6 +250,8 @@ class TiagoClientSim:
                         ):
                             manual_active = float(np.linalg.norm(np.asarray(cartesian_delta, dtype=float))) > 1e-3
                             if manual_active:
+                                # User is actively controlling; cancel any ongoing auto-approach.
+                                self.goal_step_assist.reset()
                                 self._goal_step_last_manual_joint_target = np.asarray(joints_curr, dtype=float).copy()
                                 self._goal_step_last_manual_gripper = float(gripper_val)
                             if (
@@ -274,8 +287,12 @@ class TiagoClientSim:
                         self.safety_filters['right'].reset()
                         joint_safe = self.safety_filters['right'].filter(right_joints, joint_goal)
                         safe_action['right'] = np.concatenate([joint_safe, [gripper_val]])
+                        # Record the sent command so the assist can gate the next interpolated step.
+                        self.goal_step_assist.notify_auto_arm_command(joint_safe, gripper_val)
                     else:
                         safe_action['right'] = np.concatenate([np.asarray(right_joints, dtype=float), [gripper_val]])
+                        # If IK fails during auto-approach, abort assistance.
+                        self.goal_step_assist.reset()
         
         if 'base' in raw_action:
             safe_action['base'] = raw_action['base']

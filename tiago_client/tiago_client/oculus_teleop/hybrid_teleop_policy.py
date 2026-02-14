@@ -31,6 +31,12 @@ class HybridTeleopPolicy:
         self._last_gripper_cmd = 0.0
         self.head_cmd = [0.0, 0.0]  # [pan, tilt] - absolute positions
         self.head_initialized = False
+
+        # Goal-step assist controls (handled by TiagoClient via action.extra['buttons']).
+        # - 'v': toggle enable/disable the feature
+        # - 'b': cancel current auto-approach (one-shot pulse)
+        self.goal_step_enabled = False
+        self._goal_step_cancel_pulse = False
         
         # For cartesian/joint delta accumulation
         self.cartesian_delta = np.zeros(6) # x, y, z, roll, pitch, yaw
@@ -78,6 +84,14 @@ class HybridTeleopPolicy:
                     if key == '\t':
                         self.mode = 'CARTESIAN' if self.mode == 'JOINT' else 'JOINT'
                         self._print_usage()
+                        continue
+
+                    # Goal-step assist hotkeys
+                    if key == 'v':
+                        self.goal_step_enabled = not self.goal_step_enabled
+                        continue
+                    if key == 'b':
+                        self._goal_step_cancel_pulse = True
                         continue
 
                     # Base (vx, vy, wz) — match VR interface shape to avoid server errors
@@ -161,6 +175,12 @@ class HybridTeleopPolicy:
         extra = {'buttons': {}} # Placeholder
 
         with self.lock:
+            # Expose goal-step assist controls.
+            extra['buttons']['goal_step_enabled'] = bool(self.goal_step_enabled)
+            if self._goal_step_cancel_pulse:
+                extra['buttons']['goal_step_cancel'] = True
+                self._goal_step_cancel_pulse = False
+
             # Base
             action['base'] = np.array(self.base_cmd)
             # Reset base after each read so keypress is a pulse, not a latch
